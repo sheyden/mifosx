@@ -19,10 +19,10 @@ public class GmailBackedPlatformEmailService implements PlatformEmailService {
     public void sendToUserAccount(final EmailDetail emailDetail, final String unencodedPassword) {
         Email email = new SimpleEmail();
 
-        String authuserName = "support@cloudmicrofinance.com";
+        String authuserName = "developer@musoni.eu";
 
-        String authuser = "support@cloudmicrofinance.com";
-        String authpwd = "support80";
+        String authuser = "developer@musoni.eu";
+        String authpwd = "Eod28User";
 
         // Very Important, Don't use email.setAuthentication()
         email.setAuthenticator(new DefaultAuthenticator(authuser, authpwd));
@@ -32,13 +32,13 @@ public class GmailBackedPlatformEmailService implements PlatformEmailService {
             email.getMailSession().getProperties().put("mail.smtp.starttls.enable", "true");
             email.setFrom(authuser, authuserName);
 
-            StringBuilder subjectBuilder = new StringBuilder().append("MifosX Prototype Demo: ").append(emailDetail.getContactName()).append(" user account creation.");
+            StringBuilder subjectBuilder = new StringBuilder().append("mLite: ").append(emailDetail.getContactName()).append(" user account creation.");
 
             email.setSubject(subjectBuilder.toString());
 
             String sendToEmail = emailDetail.getAddress();
 
-            StringBuilder messageBuilder = new StringBuilder().append("You are receiving this email as your email account: ").append(sendToEmail).append(" has being used to create a user account for an organisation named [").append(emailDetail.getOrganisationName()).append("] on MifosX Prototype Demo.").append("You can login using the following credentials: username: ").append(emailDetail.getUsername()).append(" password: ").append(unencodedPassword);
+            StringBuilder messageBuilder = new StringBuilder().append("You are receiving this email as your email account: ").append(sendToEmail).append(" has being used to create a user account for an organisation named [").append(emailDetail.getOrganisationName()).append("] on mLite.").append("You can login using the following credentials: username: ").append(emailDetail.getUsername()).append(" password: ").append(unencodedPassword);
 
             email.setMsg(messageBuilder.toString());
 
