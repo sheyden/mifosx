@@ -24,11 +24,12 @@ public class CommandWrapperBuilder {
     private String transactionId;
     private String supportedEntityType;
     private Long supportedEntityId;
+    private Long productId;
 
     public CommandWrapper build() {
         return new CommandWrapper(this.officeId, this.groupId, this.clientId, this.loanId, this.savingsId, this.actionName,
                 this.entityName, this.entityId, this.subentityId, this.codeId, this.supportedEntityType, this.supportedEntityId, this.href,
-                this.json, this.transactionId);
+                this.json, this.transactionId, this.productId);
     }
 
     public CommandWrapperBuilder withLoanId(final Long withLoanId) {
@@ -757,6 +758,42 @@ public class CommandWrapperBuilder {
         return this;
     }
 
+    public CommandWrapperBuilder rejectSavingsAccountApplication(final Long accountId) {
+        this.actionName = "REJECT";
+        this.entityName = "SAVINGSACCOUNT";
+        this.entityId = accountId;
+        this.savingsId = accountId;
+        this.href = "/savingsaccounts/" + accountId + "?command=reject";
+        return this;
+    }
+
+    public CommandWrapperBuilder withdrawSavingsAccountApplication(final Long accountId) {
+        this.actionName = "WITHDRAW";
+        this.entityName = "SAVINGSACCOUNT";
+        this.entityId = accountId;
+        this.savingsId = accountId;
+        this.href = "/savingsaccounts/" + accountId + "?command=withdrawnByApplicant";
+        return this;
+    }
+
+    public CommandWrapperBuilder approveSavingsAccountApplication(final Long accountId) {
+        this.actionName = "APPROVE";
+        this.entityName = "SAVINGSACCOUNT";
+        this.entityId = accountId;
+        this.savingsId = accountId;
+        this.href = "/savingsaccounts/" + accountId + "?command=approve";
+        return this;
+    }
+
+    public CommandWrapperBuilder undoSavingsAccountApplication(final Long accountId) {
+        this.actionName = "APPROVALUNDO";
+        this.entityName = "SAVINGSACCOUNT";
+        this.entityId = accountId;
+        this.savingsId = accountId;
+        this.href = "/savingsaccounts/" + accountId + "?command=undoapproval";
+        return this;
+    }
+
     public CommandWrapperBuilder savingsAccountActivation(final Long accountId) {
         this.actionName = "ACTIVATE";
         this.entityName = "SAVINGSACCOUNT";
@@ -781,6 +818,17 @@ public class CommandWrapperBuilder {
         this.savingsId = accountId;
         this.entityId = null;
         this.href = "/savingsaccounts/" + accountId + "/transactions";
+        return this;
+    }
+
+    public CommandWrapperBuilder undoSavingsAccountTransaction(final Long accountId, final Long transactionId) {
+        this.actionName = "UNDOTRANSACTION";
+        this.entityName = "SAVINGSACCOUNT";
+        this.savingsId = accountId;
+        this.entityId = accountId;
+        this.subentityId = transactionId;
+        this.transactionId = transactionId.toString();
+        this.href = "/savingsaccounts/" + accountId + "/transactions/" + transactionId + "?command=undo";
         return this;
     }
 
@@ -1036,7 +1084,7 @@ public class CommandWrapperBuilder {
         return this;
     }
 
-    public CommandWrapperBuilder assignRole(Long groupId) {
+    public CommandWrapperBuilder assignRole(final Long groupId) {
         this.actionName = "ASSIGNROLE";
         this.entityName = "GROUP";
         this.groupId = groupId;
@@ -1045,7 +1093,7 @@ public class CommandWrapperBuilder {
         return this;
     }
 
-    public CommandWrapperBuilder unassignRole(Long groupId, Long roleId) {
+    public CommandWrapperBuilder unassignRole(final Long groupId, final Long roleId) {
         this.actionName = "UNASSIGNROLE";
         this.entityName = "GROUP";
         this.groupId = groupId;
@@ -1054,7 +1102,7 @@ public class CommandWrapperBuilder {
         return this;
     }
 
-    public CommandWrapperBuilder updateRole(Long groupId, Long roleId) {
+    public CommandWrapperBuilder updateRole(final Long groupId, final Long roleId) {
         this.actionName = "UPDATEROLE";
         this.entityName = "GROUP";
         this.groupId = groupId;
@@ -1063,7 +1111,7 @@ public class CommandWrapperBuilder {
         return this;
     }
     
-    public CommandWrapperBuilder unassignClientStaff(Long clientId) {
+    public CommandWrapperBuilder unassignClientStaff(final Long clientId) {
         this.actionName = "UNASSIGNSTAFF";
         this.entityName = "CLIENT";
         this.entityId = clientId;
@@ -1072,7 +1120,7 @@ public class CommandWrapperBuilder {
         return this;
     }
 
-    public CommandWrapperBuilder assignClientStaff(Long clientId) {
+    public CommandWrapperBuilder assignClientStaff(final Long clientId) {
         this.actionName = "ASSIGNSTAFF";
         this.entityName = "CLIENT";
         this.entityId = clientId;
@@ -1080,4 +1128,45 @@ public class CommandWrapperBuilder {
         this.href = "/clients/" + clientId + "?command=assignStaff";
         return this;
     }
+
+    public CommandWrapperBuilder createProductMix(final Long productId) {
+        this.actionName = "CREATE";
+        this.entityName = "PRODUCTMIX";
+        this.entityId = null;
+        this.productId = productId;
+        this.href = "/loanproducts/" + productId + "/productmix";
+        return this;
+    }
+
+    public CommandWrapperBuilder updateProductMix(final Long productId) {
+        this.actionName = "UPDATE";
+        this.entityName = "PRODUCTMIX";
+        this.entityId = null;
+        this.productId = productId;
+        this.href = "/loanproducts/" + productId + "/productmix";
+        return this;
+    }
+    
+    public CommandWrapperBuilder deleteProductMix(final Long productId) {
+        this.actionName = "DELETE";
+        this.entityName = "PRODUCTMIX";
+        this.entityId = null;
+        this.productId = productId;
+        this.href = "/loanproducts/" + productId + "/productmix";
+        return this;
+    }
+    
+    public CommandWrapperBuilder withProduct(final Long productId) {
+        this.productId = productId;
+        return this;
+    }
+    
+    public CommandWrapperBuilder updateJobDetail(final Long jobId) {
+        this.actionName = "UPDATE";
+        this.entityName = "SCHEDULER";
+        this.entityId = jobId;
+        this.href = "/updateJobDetail/" + jobId+"/updateJobDetail";
+        return this;
+    }
+
 }

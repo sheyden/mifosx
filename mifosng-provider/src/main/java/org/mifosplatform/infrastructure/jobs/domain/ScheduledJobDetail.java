@@ -1,6 +1,8 @@
 package org.mifosplatform.infrastructure.jobs.domain;
 
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -8,6 +10,9 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.apache.commons.lang.StringUtils;
+import org.mifosplatform.infrastructure.core.api.JsonCommand;
+import org.mifosplatform.infrastructure.jobs.api.SchedulerJobApiConstants;
 import org.springframework.data.jpa.domain.AbstractPersistable;
 
 @Entity
@@ -17,12 +22,11 @@ public class ScheduledJobDetail extends AbstractPersistable<Long> {
     @Column(name = "name")
     private String jobName;
 
-    @SuppressWarnings("unused")
     @Column(name = "display_name")
     private String jobDisplayName;
 
     @Column(name = "cron_expression")
-    private String croneExpression;
+    private String cronExpression;
 
     @SuppressWarnings("unused")
     @Column(name = "create_time")
@@ -45,8 +49,8 @@ public class ScheduledJobDetail extends AbstractPersistable<Long> {
     @Temporal(TemporalType.TIMESTAMP)
     private Date nextRunTime;
 
-    @Column(name = "trigger_key")
-    private String triggerKey;
+    @Column(name = "job_key")
+    private String jobKey;
 
     @SuppressWarnings("unused")
     @Column(name = "initializing_errorlog")
@@ -55,32 +59,19 @@ public class ScheduledJobDetail extends AbstractPersistable<Long> {
     @Column(name = "is_active")
     private boolean activeSchedular;
 
-    public ScheduledJobDetail() {
+    @Column(name = "currently_running")
+    private boolean currentlyRunning;
 
-    }
+    protected ScheduledJobDetail() {
 
-    public ScheduledJobDetail(final String jobName, final String jobDisplayName, final String croneExpression, final Date createTime,
-            final Short taskPriority, final String groupName, final Date previousRunStartTime, final Date nextRunTime,
-            final String triggKey, final String errorLog, final boolean activeSchedular) {
-        this.jobName = jobName;
-        this.jobDisplayName = jobDisplayName;
-        this.croneExpression = croneExpression;
-        this.createTime = createTime;
-        this.taskPriority = taskPriority;
-        this.groupName = groupName;
-        this.previousRunStartTime = previousRunStartTime;
-        this.nextRunTime = nextRunTime;
-        this.triggerKey = triggKey;
-        this.errorLog = errorLog;
-        this.activeSchedular = activeSchedular;
     }
 
     public String getJobName() {
         return this.jobName;
     }
 
-    public String getCroneExpression() {
-        return this.croneExpression;
+    public String getCronExpression() {
+        return this.cronExpression;
     }
 
     public Short getTaskPriority() {
@@ -91,16 +82,16 @@ public class ScheduledJobDetail extends AbstractPersistable<Long> {
         return this.groupName;
     }
 
-    public String getTriggerKey() {
-        return this.triggerKey;
+    public String getJobKey() {
+        return this.jobKey;
     }
 
     public boolean isActiveSchedular() {
         return this.activeSchedular;
     }
 
-    public void updateCroneExpression(final String croneExpression) {
-        this.croneExpression = croneExpression;
+    public void updateCronExpression(final String cronExpression) {
+        this.cronExpression = cronExpression;
     }
 
     public void updatePreviousRunStartTime(final Date previousRunStartTime) {
@@ -111,12 +102,43 @@ public class ScheduledJobDetail extends AbstractPersistable<Long> {
         this.nextRunTime = nextRunTime;
     }
 
-    public void updateTriggerKey(final String triggerKey) {
-        this.triggerKey = triggerKey;
+    public void updateJobKey(String jobKey) {
+        this.jobKey = jobKey;
     }
 
     public void updateErrorLog(final String errorLog) {
         this.errorLog = errorLog;
+    }
+
+    public boolean isCurrentlyRunning() {
+        return this.currentlyRunning;
+    }
+
+    public void updateCurrentlyRunningStatus(boolean currentlyRunning) {
+        this.currentlyRunning = currentlyRunning;
+    }
+
+    public Map<String, Object> update(final JsonCommand command) {
+        final Map<String, Object> actualChanges = new LinkedHashMap<String, Object>(9);
+
+        if (command.isChangeInStringParameterNamed(SchedulerJobApiConstants.displayNameParamName, this.jobDisplayName)) {
+            final String newValue = command.stringValueOfParameterNamed(SchedulerJobApiConstants.displayNameParamName).trim();
+            actualChanges.put(SchedulerJobApiConstants.displayNameParamName, newValue);
+            this.jobDisplayName = StringUtils.defaultIfEmpty(newValue, null);
+        }
+        if (command.isChangeInStringParameterNamed(SchedulerJobApiConstants.cronExpressionParamName, this.cronExpression)) {
+            final String newValue = command.stringValueOfParameterNamed(SchedulerJobApiConstants.cronExpressionParamName).trim();
+            actualChanges.put(SchedulerJobApiConstants.cronExpressionParamName, newValue);
+            this.cronExpression = StringUtils.defaultIfEmpty(newValue, null);
+        }
+
+        if (command.isChangeInBooleanParameterNamed(SchedulerJobApiConstants.jobActiveStatusParamName, this.activeSchedular)) {
+            final boolean newValue = command.booleanPrimitiveValueOfParameterNamed(SchedulerJobApiConstants.jobActiveStatusParamName);
+            actualChanges.put(SchedulerJobApiConstants.jobActiveStatusParamName, newValue);
+            this.activeSchedular = newValue;
+        }
+
+        return actualChanges;
     }
 
 }
