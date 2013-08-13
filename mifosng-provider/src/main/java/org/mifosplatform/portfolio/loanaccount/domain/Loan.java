@@ -1075,8 +1075,8 @@ public class Loan extends AbstractPersistable<Long> {
 
     public void loanApplicationSubmittal(final AppUser currentUser, final LoanScheduleModel loanSchedule,
             final LoanApplicationTerms loanApplicationTerms, final LoanLifecycleStateMachine lifecycleStateMachine,
-            final LocalDate submittedOn, final String externalId, final boolean isHolidayEnabled, final List<Holiday> holidays,
-            final WorkingDays workingDays) {
+            final LocalDate submittedOn, final String externalId, final boolean allowTransactionsOnHoliday, final List<Holiday> holidays,
+            final WorkingDays workingDays, final boolean allowTransactionsOnNonWorkingDay) {
 
         updateLoanSchedule(loanSchedule);
 
@@ -1125,8 +1125,8 @@ public class Loan extends AbstractPersistable<Long> {
         }
         
         //validate if disbursement date is a holiday or a non-working day
-        validateDisbursementDateIsOnNonWorkingDay(workingDays);
-        validateDisbursementDateIsOnHoliday(isHolidayEnabled, holidays);
+        validateDisbursementDateIsOnNonWorkingDay(workingDays, allowTransactionsOnNonWorkingDay);
+        validateDisbursementDateIsOnHoliday(allowTransactionsOnHoliday, holidays);
     }
     
     private LocalDate determineExpectedMaturityDate() {
@@ -1317,7 +1317,8 @@ public class Loan extends AbstractPersistable<Long> {
     public Map<String, Object> disburse(final LoanScheduleGeneratorFactory loanScheduleFactory, final AppUser currentUser,
             final JsonCommand command, final ApplicationCurrency currency, final List<Long> existingTransactionIds,
             final List<Long> existingReversedTransactionIds, final Map<String, Object> actualChanges, final PaymentDetail paymentDetail,
-            final LocalDate calculatedRepaymentsStartingFromDate, final boolean isHolidayEnabled, final List<Holiday> holidays, final WorkingDays workingDays) {
+            final LocalDate calculatedRepaymentsStartingFromDate, final boolean isHolidayEnabled, final List<Holiday> holidays,
+            final WorkingDays workingDays, final boolean allowTransactionsOnHoliday, final boolean allowTransactionsOnNonWorkingDay) {
 
         updateLoanToPreDisbursalState();
 
@@ -1341,8 +1342,8 @@ public class Loan extends AbstractPersistable<Long> {
             actualChanges.put("actualDisbursementDate", command.stringValueOfParameterNamed("actualDisbursementDate"));
 
           //validate if disbursement date is a holiday or a non-working day
-            validateDisbursementDateIsOnNonWorkingDay(workingDays);
-            validateDisbursementDateIsOnHoliday(isHolidayEnabled, holidays);
+            validateDisbursementDateIsOnNonWorkingDay(workingDays, allowTransactionsOnNonWorkingDay);
+            validateDisbursementDateIsOnHoliday(allowTransactionsOnHoliday, holidays);
             
             handleDisbursementTransaction(paymentDetail, actualDisbursementDate);
 
@@ -1514,11 +1515,11 @@ public class Loan extends AbstractPersistable<Long> {
 
     public ChangedTransactionDetail makeRepayment(final LoanTransaction repaymentTransaction,
             final LoanLifecycleStateMachine loanLifecycleStateMachine, final List<Long> existingTransactionIds,
-            final List<Long> existingReversedTransactionIds, final boolean isHolidayEnabled, final List<Holiday> holidays,
-            final WorkingDays workingDays) {
+            final List<Long> existingReversedTransactionIds, final boolean allowTransactionsOnHoliday, final List<Holiday> holidays,
+            final WorkingDays workingDays, final boolean allowTransactionsOnNonWorkingDay) {
 
-        validateRepaymentDateIsOnHoliday(repaymentTransaction.getTransactionDate(), isHolidayEnabled, holidays);
-        validateRepaymentDateIsOnNonWorkingDay(repaymentTransaction.getTransactionDate(), workingDays);
+        validateRepaymentDateIsOnHoliday(repaymentTransaction.getTransactionDate(), allowTransactionsOnHoliday, holidays);
+        validateRepaymentDateIsOnNonWorkingDay(repaymentTransaction.getTransactionDate(), workingDays, allowTransactionsOnNonWorkingDay);
         
         existingTransactionIds.addAll(findExistingTransactionIds());
         existingReversedTransactionIds.addAll(findExistingReversedTransactionIds());
@@ -1739,7 +1740,12 @@ public class Loan extends AbstractPersistable<Long> {
 
     public ChangedTransactionDetail adjustExistingTransaction(final LoanTransaction newTransactionDetail,
             final LoanLifecycleStateMachine loanLifecycleStateMachine, final LoanTransaction transactionForAdjustment,
-            final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds) {
+            final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds,
+            final boolean allowTransactionsOnHoliday, final List<Holiday> holidays, final WorkingDays workingDays,
+            final boolean allowTransactionsOnNonWorkingDay) {
+
+        validateRepaymentDateIsOnHoliday(newTransactionDetail.getTransactionDate(), allowTransactionsOnHoliday, holidays);
+        validateRepaymentDateIsOnNonWorkingDay(newTransactionDetail.getTransactionDate(), workingDays, allowTransactionsOnNonWorkingDay);
 
         ChangedTransactionDetail changedTransactionDetail = null;
 
@@ -1752,18 +1758,36 @@ public class Loan extends AbstractPersistable<Long> {
                     errorMessage);
         }
 
-        if (isClosed()) {
-            final String errorMessage = "Transactions of a closed loan cannot be adjusted.";
-            throw new InvalidLoanTransactionTypeException("transaction", "adjustment.is.not.allowed.on.closed.loan", errorMessage);
+        transactionForAdjustment.reverse();
+
+        if (isClosedWrittenOff()) {
+            // find write off transaction and reverse it
+            LoanTransaction writeOffTransaction = findWriteOffTransaction();
+            writeOffTransaction.reverse();
         }
 
-        transactionForAdjustment.reverse();
+        if (isClosedObligationsMet() || isClosedWrittenOff() || isClosedWithOutsandingAmountMarkedForReschedule()) {
+            this.loanStatus = LoanStatus.ACTIVE.getValue();
+        }
+
         if (newTransactionDetail.isRepayment() || newTransactionDetail.isInterestWaiver()) {
             changedTransactionDetail = handleRepaymentOrWaiverTransaction(newTransactionDetail, loanLifecycleStateMachine,
                     transactionForAdjustment);
         }
 
         return changedTransactionDetail;
+    }
+
+    private LoanTransaction findWriteOffTransaction() {
+
+        LoanTransaction writeOff = null;
+        for (LoanTransaction transaction : this.loanTransactions) {
+            if (!transaction.isReversed() && transaction.isWriteOff()) {
+                writeOff = transaction;
+            }
+        }
+
+        return writeOff;
     }
 
     private boolean isOverPaid() {
@@ -1797,7 +1821,8 @@ public class Loan extends AbstractPersistable<Long> {
     }
 
     public LoanTransaction closeAsWrittenOff(final JsonCommand command, final LoanLifecycleStateMachine loanLifecycleStateMachine,
-            final Map<String, Object> changes, final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds) {
+            final Map<String, Object> changes, final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds,
+            final AppUser currentUser) {
 
         final LoanStatus statusEnum = loanLifecycleStateMachine.transition(LoanEvent.WRITE_OFF_OUTSTANDING,
                 LoanStatus.fromInt(this.loanStatus));
@@ -1814,6 +1839,7 @@ public class Loan extends AbstractPersistable<Long> {
 
             this.closedOnDate = writtenOffOnLocalDate.toDate();
             this.writtenOffOnDate = writtenOffOnLocalDate.toDate();
+            this.closedBy = currentUser;
             changes.put("closedOnDate", command.stringValueOfParameterNamed("transactionDate"));
             changes.put("writtenOffOnDate", command.stringValueOfParameterNamed("transactionDate"));
 
@@ -1989,6 +2015,18 @@ public class Loan extends AbstractPersistable<Long> {
         return status().isClosed() || this.isCancelled();
     }
 
+    private boolean isClosedObligationsMet() {
+        return status().isClosedObligationsMet();
+    }
+
+    private boolean isClosedWrittenOff() {
+        return status().isClosedWrittenOff();
+    }
+
+    private boolean isClosedWithOutsandingAmountMarkedForReschedule() {
+        return status().isClosedWithOutsandingAmountMarkedForReschedule();
+    }
+
     private boolean isCancelled() {
         return this.isRejected() || this.isWithdrawn();
     }
@@ -2020,7 +2058,7 @@ public class Loan extends AbstractPersistable<Long> {
         return this.submittedOnDate == null ? false : (new LocalDate(submittedOnDate)).isAfter(compareDate);
     }
 
-    private LocalDate getSubmittedOnDate() {
+    public LocalDate getSubmittedOnDate() {
         return (LocalDate) ObjectUtils.defaultIfNull(new LocalDate(this.submittedOnDate), null);
     }
 
@@ -2357,23 +2395,33 @@ public class Loan extends AbstractPersistable<Long> {
 
     public void updateLoanRepaymentScheduleDates(final LocalDate meetingStartDate, final String recuringRule,
             final boolean isHolidayEnabled, final List<Holiday> holidays, final WorkingDays workingDays) {
-        //update repayment dates of repayment schedule installaments
-        LocalDate tmpFromDate = this.getDisbursementDate();//first repayment's from date is same as disbursement date.
+
+        LocalDate tmpFromDate = this.getDisbursementDate();
+        final PeriodFrequencyType repaymentPeriodFrequencyType = this.loanRepaymentScheduleDetail.getRepaymentPeriodFrequencyType();
+        final Integer loanRepaymentInterval = this.loanRepaymentScheduleDetail.getRepayEvery();
+        final String frequency = CalendarHelper.getMeetingFrequencyFromPeriodFrequencyType(repaymentPeriodFrequencyType);
+
         LocalDate newRepaymentDate = null;
         for (LoanRepaymentScheduleInstallment loanRepaymentScheduleInstallment : this.repaymentScheduleInstallments) {
             final LocalDate oldDueDate = loanRepaymentScheduleInstallment.getDueDate();
             // FIXME: AA this won't update repayment dates before current date.
             if (oldDueDate.isAfter(meetingStartDate) && oldDueDate.isAfter(DateUtils.getLocalDateOfTenant())) {
-                final PeriodFrequencyType repaymentPeriodFrequencyType = this.loanRepaymentScheduleDetail.getRepaymentPeriodFrequencyType();
-                final String frequency = CalendarHelper.getMeetingFrequencyFromPeriodFrequencyType(repaymentPeriodFrequencyType);
-                final Integer loanRepaymentInterval = this.loanRepaymentScheduleDetail.getRepayEvery();
 
-                // reset repayment date with new meeting date
-                newRepaymentDate = CalendarHelper.getNewRepaymentMeetingDate(recuringRule, meetingStartDate, oldDueDate, loanRepaymentInterval, frequency, workingDays);
-                if(isHolidayEnabled){
+                newRepaymentDate = CalendarHelper.getNewRepaymentMeetingDate(recuringRule, meetingStartDate, oldDueDate,
+                        loanRepaymentInterval, frequency, workingDays);
+
+                final LocalDate maxDateLimitForNewRepayment = getMaxDateLimitForNewRepayment(repaymentPeriodFrequencyType,
+                        loanRepaymentInterval, tmpFromDate);
+
+                if (newRepaymentDate.isAfter(maxDateLimitForNewRepayment)) {
+                    newRepaymentDate = CalendarHelper.getNextRepaymentMeetingDate(recuringRule, meetingStartDate, tmpFromDate,
+                            loanRepaymentInterval, frequency, workingDays);
+                }
+
+                if (isHolidayEnabled) {
                     newRepaymentDate = HolidayUtil.getRepaymentRescheduleDateToIfHoliday(newRepaymentDate, holidays);
                 }
-                                
+
                 loanRepaymentScheduleInstallment.updateDueDate(newRepaymentDate);
                 // reset from date to get actual daysInPeriod
                 loanRepaymentScheduleInstallment.updateFromDate(tmpFromDate);
@@ -2383,6 +2431,29 @@ public class Loan extends AbstractPersistable<Long> {
             }
 
         }
+    }
+
+    private LocalDate getMaxDateLimitForNewRepayment(final PeriodFrequencyType periodFrequencyType, final Integer loanRepaymentInterval,
+            final LocalDate startDate) {
+        LocalDate dueRepaymentPeriodDate = startDate;
+        final Integer repaidEvery = 2*loanRepaymentInterval;
+        switch (periodFrequencyType) {
+            case DAYS:
+                dueRepaymentPeriodDate = startDate.plusDays(repaidEvery);
+            break;
+            case WEEKS:
+                dueRepaymentPeriodDate = startDate.plusWeeks(repaidEvery);
+            break;
+            case MONTHS:
+                dueRepaymentPeriodDate = startDate.plusMonths(repaidEvery);
+            break;
+            case YEARS:
+                dueRepaymentPeriodDate = startDate.plusYears(repaidEvery);
+            break;
+            case INVALID:
+            break;
+        }
+        return dueRepaymentPeriodDate.minusDays(1);//get 2n-1 range date from startDate
     }
 
     public void applyHolidayToRepaymentScheduleDates(final Holiday holiday) {
@@ -2410,15 +2481,17 @@ public class Loan extends AbstractPersistable<Long> {
         }
     }
 
-    private void validateDisbursementDateIsOnNonWorkingDay(final WorkingDays workingDays) {
-        if(!WorkingDaysUtil.isWorkingDay(workingDays, getDisbursementDate())){
-            final String errorMessage = "Expected disbursement date cannot be on a non working day";
-            throw new LoanApplicationDateException("disbursement.date.on.non.working.day", errorMessage, getExpectedDisbursedOnLocalDate());
+    private void validateDisbursementDateIsOnNonWorkingDay(final WorkingDays workingDays, final boolean allowTransactionsOnNonWorkingDay) {
+        if (!allowTransactionsOnNonWorkingDay) {
+            if(!WorkingDaysUtil.isWorkingDay(workingDays, getDisbursementDate())){
+                final String errorMessage = "Expected disbursement date cannot be on a non working day";
+                throw new LoanApplicationDateException("disbursement.date.on.non.working.day", errorMessage, getExpectedDisbursedOnLocalDate());
+            }
         }
     }
 
-    private void validateDisbursementDateIsOnHoliday(final boolean isHolidayEnabled, final List<Holiday> holidays) {
-        if (isHolidayEnabled) {
+    private void validateDisbursementDateIsOnHoliday(final boolean allowTransactionsOnHoliday, final List<Holiday> holidays) {
+        if (!allowTransactionsOnHoliday) {
             if (HolidayUtil.isHoliday(getDisbursementDate(), holidays)) {
                 final String errorMessage = "Expected disbursement date cannot be on a holiday";
                 throw new LoanApplicationDateException("disbursement.date.on.holiday", errorMessage,
@@ -2427,15 +2500,19 @@ public class Loan extends AbstractPersistable<Long> {
         }
     }
     
-    private void validateRepaymentDateIsOnNonWorkingDay(final LocalDate repaymentDate, final WorkingDays workingDays) {
-        if(!WorkingDaysUtil.isWorkingDay(workingDays, repaymentDate)){
-            final String errorMessage = "Repayment date cannot be on a non working day";
-            throw new LoanApplicationDateException("repayment.date.on.non.working.day", errorMessage, repaymentDate);
+    private void validateRepaymentDateIsOnNonWorkingDay(final LocalDate repaymentDate, final WorkingDays workingDays,
+            final boolean allowTransactionsOnNonWorkingDay) {
+        if (!allowTransactionsOnNonWorkingDay) {
+            if (!WorkingDaysUtil.isWorkingDay(workingDays, repaymentDate)) {
+                final String errorMessage = "Repayment date cannot be on a non working day";
+                throw new LoanApplicationDateException("repayment.date.on.non.working.day", errorMessage, repaymentDate);
+            }
         }
     }
 
-    private void validateRepaymentDateIsOnHoliday(final LocalDate repaymentDate, final boolean isHolidayEnabled, final List<Holiday> holidays) {
-        if (isHolidayEnabled) {
+    private void validateRepaymentDateIsOnHoliday(final LocalDate repaymentDate, final boolean allowTransactionsOnHoliday,
+            final List<Holiday> holidays) {
+        if (!allowTransactionsOnHoliday) {
             if (HolidayUtil.isHoliday(repaymentDate, holidays)) {
                 final String errorMessage = "Repayment date cannot be on a holiday";
                 throw new LoanApplicationDateException("repayment.date.on.holiday", errorMessage, repaymentDate);
@@ -2477,6 +2554,18 @@ public class Loan extends AbstractPersistable<Long> {
 
     public Integer getTermPeriodFrequencyType() {
         return this.termPeriodFrequencyType;
+    }
+
+    public void validateExpectedDisbursementForHolidayAndNonWorkingDay(final WorkingDays workingDays,
+            final boolean allowTransactionsOnHoliday, final List<Holiday> holidays, final boolean allowTransactionsOnNonWorkingDay) {
+        // validate if disbursement date is a holiday or a non-working day
+        validateDisbursementDateIsOnNonWorkingDay(workingDays, allowTransactionsOnNonWorkingDay);
+        validateDisbursementDateIsOnHoliday(allowTransactionsOnHoliday, holidays);
+
+    }
+
+    public void updateGroup(Group group) {
+        this.group = group;
     }
 
 }

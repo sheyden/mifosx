@@ -5,6 +5,9 @@ See VERSIONING (https://github.com/openMF/mifosx/blob/master/VERSIONING.md) for 
 
 Releases
 ===============
+1. 12 Aug 2013 - 1.7.1.RELEASE
+1. 28 July 2013 - 1.7.0.RELEASE
+1. 28 July 2013 - 1.6.1.RELEASE
 1. 20 July 2013 - 1.6.0.RELEASE
 1. 14 July 2013 - 1.5.0.RELEASE
 1. 25 Jun 2013 - 1.4.1.RELEASE
@@ -26,6 +29,62 @@ Releases
 1. 10 April 2013 - 0.11.2.beta
 1. 05 April 2013 - 0.11.1.beta
 1. 05 April 2013 - 0.11.0.beta
+
+1.7.1.RELEASE
+=============
+Bug Release
+
+Platform & API
+
+Bug
+ - [MIFOSX-538] - Search is displaying duplicate result if acct number is part of client name
+ - [MIFOSX-554] - In Group loan if meeting dates are getting rescheduled frequently, the repayment is getting extended.
+ - [MIFOSX-555] - Return write-off date and transaction history for written off loans
+ - [MIFOSX-581] - Batch job is starting even when scheduler is in suspended state
+ - [MIFOSX-589] - Adjust Transactions accepts Holidays and non working days.
+ - [MIFOSX-597] - Closed client under Group applying for JLG loan
+ - [MIFOSX-598] - Closed client under Group applying for New Savings Account
+ - [MIFOSX-600] - Allowing to Disassociate a client from the Group who is having a active savings account under that Group
+
+New Features & Improvements
+ - [MIFOSX-428] - Add user giving invalid emailid error
+
+1.7.0.RELEASE
+=============
+Feature Release
+
+This Feature Release ships a stable version of the Scheduler and Product mix functionality along with minor updates to Savings functionality
+
+Platform & API
+
+Bug 
+ - [MIFOSX-397] - Annual fee collection date is displaying on 2nd year of opening/activation date of savings account.
+
+New Features & Improvements
+ - [MIFOSX-495] - Client performance History
+ - [MIFOSX-565] - Support ability to undo/reverse transactions even when the loan is in closed state
+ - [MIFOSX-563] - Repayment strategy is not displayed in loan account details page
+ - [MIFOSX-548] - A holiday's "Reschedule Repayment to" date should not be a non-working day
+ - [MIFOSX-506] - Batch Job Implementation - Part 2
+ - [MIFOSX-478] - Product Mix Functionality
+ - [MIFOSX-470] - Avoiding Deletion of active Charge which was already assigned to a Loan product.
+ - [MIFOSX-428] - Add user giving invalid emailid error
+ 
+Reference App
+ - [MIFOSX-561] - Add loan cycle and loan product cycle details to Client Summary
+
+1.6.1.RELEASE
+=============
+Bug Release
+
+Platform & API
+
+Bug
+ - [MIFOSX-485] - In Groups -> Group loan under "Submitted and pending approval" state -> "Change loan application" page,not able to edit/update "Sync repayments with meeting" and "Loan term" fields.
+ - [MIFOSX-564] - Create data table does not work for attached request
+ 
+Reference App
+ - [MIFOSX-560] - In "Modify Application page" if Product is changed, it not getting updated in Loan account overview list
 
 1.6.0.RELEASE
 =============
