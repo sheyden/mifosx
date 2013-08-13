@@ -105,7 +105,14 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
     private NewCommandSourceHandler findCommandHandler(final CommandWrapper wrapper) {
         NewCommandSourceHandler handler = null;
 
-        if (wrapper.isConfigurationResource()) {
+        if (wrapper.isAccountTransferResource()) {
+            if (wrapper.isCreate()) {
+                handler = this.applicationContext.getBean("createAccountTransferCommandHandler", NewCommandSourceHandler.class);
+            } else {
+                throw new UnsupportedCommandException(wrapper.commandName());
+            }
+        }
+        else if (wrapper.isConfigurationResource()) {
             handler = this.applicationContext.getBean("updateGlobalConfigurationCommandHandler", NewCommandSourceHandler.class);
         } else if (wrapper.isDatatableResource()) {
             if (wrapper.isCreateDatatable()) {
@@ -401,8 +408,12 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
                 handler = this.applicationContext.getBean("calculateInterestSavingsAccountCommandHandler", NewCommandSourceHandler.class);
             } else if (wrapper.isSavingsAccountInterestPosting()) {
                 handler = this.applicationContext.getBean("postInterestSavingsAccountCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isSavingsAccountApplyAnnualFee()) {
+                handler = this.applicationContext.getBean("applyAnnualFeeSavingsAccountCommandHandler", NewCommandSourceHandler.class);
             } else if (wrapper.isSavingsAccountUndoTransaction()) {
                 handler = this.applicationContext.getBean("undoTransactionSavingsAccountCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isAdjustSavingsAccountTransaction()) {
+                handler = this.applicationContext.getBean("savingsTransactionAdjustmentCommandHandler", NewCommandSourceHandler.class);
             } else {
                 throw new UnsupportedCommandException(wrapper.commandName());
             }
@@ -439,7 +450,9 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
                 handler = this.applicationContext.getBean("unassignRoleCommandHandler", NewCommandSourceHandler.class);
             } else if (wrapper.isUpdateGroupRole()) {
                 handler = this.applicationContext.getBean("updateGroupRoleCommandHandler", NewCommandSourceHandler.class);
-            } else {
+            }  else if (wrapper.isAssignStaff()) {
+                handler = this.applicationContext.getBean("assignGroupStaffCommandHandler", NewCommandSourceHandler.class);
+            }else {
                 throw new UnsupportedCommandException(wrapper.commandName());
             }
         } else if (wrapper.isCenterResource()) {

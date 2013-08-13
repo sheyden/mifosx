@@ -39,11 +39,11 @@ public final class LoanProductDataValidator {
      * The parameters supported for this command.
      */
     private final Set<String> supportedParameters = new HashSet<String>(Arrays.asList("locale", "dateFormat", "name", "description", "fundId",
-            "currencyCode", "digitsAfterDecimal", "principal", "minPrincipal", "maxPrincipal", "repaymentEvery", "numberOfRepayments",
+            "currencyCode", "digitsAfterDecimal","inMulitplesOf", "principal", "minPrincipal", "maxPrincipal", "repaymentEvery", "numberOfRepayments",
             "minNumberOfRepayments", "maxNumberOfRepayments", "repaymentFrequencyType", "interestRatePerPeriod",
             "minInterestRatePerPeriod", "maxInterestRatePerPeriod", "interestRateFrequencyType", "amortizationType", "interestType",
             "interestCalculationPeriodType", "inArrearsTolerance", "transactionProcessingStrategyId", "graceOnPrincipalPayment",
-            "graceOnInterestPayment", "graceOnInterestCharged", "charges", "accountingRule","includeInBorrowerCycle", "startDate", "closeDate",
+            "graceOnInterestPayment", "graceOnInterestCharged", "charges", "accountingRule","includeInBorrowerCycle", "startDate", "closeDate", "externalId",
             LOAN_PRODUCT_ACCOUNTING_PARAMS.FEES_RECEIVABLE.getValue(), LOAN_PRODUCT_ACCOUNTING_PARAMS.FUND_SOURCE.getValue(),
             LOAN_PRODUCT_ACCOUNTING_PARAMS.INCOME_FROM_FEES.getValue(), LOAN_PRODUCT_ACCOUNTING_PARAMS.INCOME_FROM_PENALTIES.getValue(),
             LOAN_PRODUCT_ACCOUNTING_PARAMS.INTEREST_ON_LOANS.getValue(), LOAN_PRODUCT_ACCOUNTING_PARAMS.INTEREST_RECEIVABLE.getValue(),
@@ -91,6 +91,9 @@ public final class LoanProductDataValidator {
 
         final Integer digitsAfterDecimal = fromApiJsonHelper.extractIntegerNamed("digitsAfterDecimal", element, Locale.getDefault());
         baseDataValidator.reset().parameter("digitsAfterDecimal").value(digitsAfterDecimal).notNull().inMinMaxRange(0, 6);
+        
+        final Integer inMulitplesOf = fromApiJsonHelper.extractIntegerNamed("inMulitplesOf", element, Locale.getDefault());
+        baseDataValidator.reset().parameter("inMulitplesOf").value(inMulitplesOf).ignoreIfNull().integerZeroOrGreater();
 
         final BigDecimal principal = fromApiJsonHelper.extractBigDecimalWithLocaleNamed("principal", element);
         baseDataValidator.reset().parameter("principal").value(principal).notNull().positiveAmount();
@@ -333,6 +336,11 @@ public final class LoanProductDataValidator {
         if (fromApiJsonHelper.parameterExists("digitsAfterDecimal", element)) {
             final Integer digitsAfterDecimal = fromApiJsonHelper.extractIntegerNamed("digitsAfterDecimal", element, Locale.getDefault());
             baseDataValidator.reset().parameter("digitsAfterDecimal").value(digitsAfterDecimal).notNull().inMinMaxRange(0, 6);
+        }
+        
+        if (fromApiJsonHelper.parameterExists("inMulitplesOf", element)) {
+            final Integer inMulitplesOf = fromApiJsonHelper.extractIntegerNamed("inMulitplesOf", element, Locale.getDefault());
+            baseDataValidator.reset().parameter("inMulitplesOf").value(inMulitplesOf).ignoreIfNull().integerZeroOrGreater();
         }
 
         String minPrincipalParameterName = "minPrincipal";

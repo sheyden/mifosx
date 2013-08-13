@@ -27,6 +27,10 @@ public class OrganisationCurrency extends AbstractPersistable<Long> {
     private final Integer decimalPlaces;
 
     @SuppressWarnings("unused")
+    @Column(name = "currency_multiplesof")
+    private final Integer inMulitplesOf;
+
+    @SuppressWarnings("unused")
     @Column(name = "name", nullable = false, length = 50)
     private final String name;
 
@@ -42,15 +46,17 @@ public class OrganisationCurrency extends AbstractPersistable<Long> {
         this.code = null;
         this.name = null;
         this.decimalPlaces = null;
+        this.inMulitplesOf = null;
         this.nameCode = null;
         this.displaySymbol = null;
     }
 
-    public OrganisationCurrency(final String code, final String name, final int decimalPlaces, final String nameCode,
-            final String displaySymbol) {
+    public OrganisationCurrency(final String code, final String name, final int decimalPlaces, final Integer inMulitplesOf,
+            final String nameCode, final String displaySymbol) {
         this.code = code;
         this.name = name;
         this.decimalPlaces = decimalPlaces;
+        this.inMulitplesOf = inMulitplesOf;
         this.nameCode = nameCode;
         this.displaySymbol = displaySymbol;
     }
