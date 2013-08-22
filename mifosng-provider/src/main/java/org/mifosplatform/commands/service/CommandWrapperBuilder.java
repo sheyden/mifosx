@@ -351,6 +351,15 @@ public class CommandWrapperBuilder {
         this.href = "/clients/" + clientId + "?command=close&template=true";
         return this;
     }
+    
+    public CommandWrapperBuilder transferClient(final Long clientId) {
+        this.actionName = "TRANSFER";
+        this.entityName = "CLIENT";
+        this.entityId = clientId;
+        this.clientId = clientId;
+        this.href = "/clientId/" + clientId + "?command=transfer";
+        return this;
+    }
 
     public CommandWrapperBuilder updateClient(final Long clientId) {
         this.actionName = "UPDATE";
@@ -1000,6 +1009,15 @@ public class CommandWrapperBuilder {
         this.href = "/groups/" + groupId + "?command=disassociateClients";
         return this;
     }
+    
+    public CommandWrapperBuilder transferClientsBetweenGroups(final Long sourceGroupId) {
+        this.actionName = "TRANSFERCLIENTS";
+        this.entityName = "GROUP";
+        this.entityId = sourceGroupId;
+        this.groupId = sourceGroupId;
+        this.href = "/groups/" + sourceGroupId + "?command=transferClients";
+        return this;
+    }
 
     public CommandWrapperBuilder unassignGroupStaff(final Long groupId) {
         this.actionName = "UNASSIGNSTAFF";
@@ -1208,6 +1226,41 @@ public class CommandWrapperBuilder {
         this.entityName = "SCHEDULER";
         this.entityId = jobId;
         this.href = "/updateJobDetail/" + jobId + "/updateJobDetail";
+        return this;
+    }
+
+    public CommandWrapperBuilder createMeeting(final String supportedEntityType, final Long supportedEntityId) {
+        this.actionName = "CREATE";
+        this.entityName = "MEETING";
+        this.supportedEntityType = supportedEntityType;
+        this.supportedEntityId = supportedEntityId;
+        this.href = "/" + supportedEntityType + "/" + supportedEntityId + "/meetings";
+        return this;
+    }
+
+    public CommandWrapperBuilder updateMeeting(final String supportedEntityType, final Long supportedEntityId, final Long meetingId) {
+        this.actionName = "UPDATE";
+        this.entityName = "MEETING";
+        this.entityId = meetingId;
+        this.href = "/" + supportedEntityType + "/" + supportedEntityId + "/meetings/" + meetingId;
+        return this;
+    }
+
+    public CommandWrapperBuilder deleteMeeting(final String supportedEntityType, final Long supportedEntityId, final Long meetingId) {
+        this.actionName = "DELETE";
+        this.entityName = "MEETING";
+        this.entityId = meetingId;
+        this.href = "/" + supportedEntityType + "/" + supportedEntityId + "/meetings/" + meetingId;
+        return this;
+    }
+    
+    public CommandWrapperBuilder saveOrUpdateAttendance(final Long entityId, final String supportedEntityType, final Long supportedEntityId) {
+        this.actionName = "SAVEORUPDATEATTENDANCE";
+        this.entityName = "MEETING";
+        this.entityId = entityId;
+        this.supportedEntityType = supportedEntityType;
+        this.supportedEntityId = supportedEntityId;
+        this.href = "/" + supportedEntityType + "/" + supportedEntityId + "/meetings/" + entityId + "?command=saveOrUpdateAttendance";
         return this;
     }
 }

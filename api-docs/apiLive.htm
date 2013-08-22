@@ -90,7 +90,7 @@
 <body>
 	<div id="page-wrapper">
 		<div id="flybar">
-			<div id="nav-logo">1.8.0.DEVELOP API</div>
+			<div id="nav-logo">1.8.1.RELEASE API</div>
 			<div class="flybar-nav">
 				<h2 class="flybar-button">Overview</h2>
 				<div class="flybar-menu-overview">
@@ -208,6 +208,14 @@
 								<td></td>
 							</tr>
 							<tr class="alt">
+								<td></td>
+								<td>clients/{clientId}?command=transfer</td>
+								<td><a href="#clients_transfer">Transfer Client</a></td>
+								<td></td>
+								<td></td>
+								<td></td>
+							</tr>
+							<tr>
 								<td></td>
 								<td>clients/{clientId}/accounts</td>
 								<td></td>
@@ -572,6 +580,14 @@
 								<td>groups/{groupId}/accounts</td>
 								<td></td>
 								<td><a href="#groups_accounts">Retrive Group accounts summary</a></td>
+								<td></td>
+								<td></td>
+							</tr>
+							<tr>
+								<td></td>
+								<td>groups/{groupId}?command=transferClients</td>
+								<td><a href="#groups_transfer_clients">Transfer Clients</a></td>
+								<td></td>
 								<td></td>
 								<td></td>
 							</tr>
@@ -2120,7 +2136,33 @@ Request Body:
 }
 	        </code>
 	    </div>
-	</div>	
+	</div>
+
+	<a id="clients_transfer" name="clients_transfer" class="old-syle-anchor">&nbsp;</a>
+	<div class="method-section">
+	    <div class="method-description">
+	        <h4>Transfer a Client</h4>
+	        <p>Allows you to transfer a <i>Client</i> between <i>Offices</i>.</p>
+	    </div>
+		<div class="method-example">
+	        <code class="method-declaration">POST https://Domain Name/api/v1/clients/{clientId}?command=transfer</code>
+	        <code class="method-request">POST clients/1?command=transfer
+Content-Type: application/json
+Request Body:
+{
+  destinationOfficeId:1
+}				
+			</code>
+	        <code class="method-response">
+{
+   "clientId": 2,
+   "resourceId": 2
+}
+
+
+	        </code>
+	    </div>
+	</div>		
 			<a id="clients_retrieve" name="clients_retrieve" class="old-syle-anchor">&nbsp;</a>
 			<div class="method-section">
 				<div class="method-description">
@@ -3782,6 +3824,118 @@ Request Body:
 	        </code>
 	    </div>
 	</div>
+
+	<a id="groups_associate_clients" name="groups_associate_clients" class="old-syle-anchor">&nbsp;</a>
+	<div class="method-section">
+	    <div class="method-description">
+	        <h2>Associate Clients</h2>
+	        <p>This API allows to associate existing clients to a group.</p>
+	        <p>The clients are listed from the office to which the group is associated.</p>
+	        <p>If client(s) is already associated with group then API will result in an error.</p>
+	    </div>
+
+	    <div class="method-example">
+	        <code class="method-declaration">POST https://Domain Name/api/v1/groups/{groupId}?command=associateClients</code>
+	        <code class="method-request">POST groups/1?command=associateClients
+Content-Type: application/json
+Request Body:
+{
+  "clientMembers":[1,2]
+}
+			</code>
+	        <code class="method-response">
+{
+  "officeId": 1,
+  "groupId": 1,
+  "resourceId": 1,
+  "clientMembers": [1,2]
+}
+	        </code>
+	    </div>
+	</div>
+			<a id="groups_transfer_clients" name="groups_transfer_clients" class="old-syle-anchor">&nbsp;</a>
+			<div class="method-section">
+			    <div class="method-description">
+			        <h2>Transfer Clients across groups</h2>
+			        <p>This API allows to transfer clients from one group to another</p>
+			        <table class=matrixHeading>
+						<tr class="matrixHeadingBG">
+							<td><div class="mifosXHeading2">Field Descriptions</div></td>
+						</tr>
+						<tr class=alt>
+							<td>destinationGroupId</td>
+						</tr>
+						<tr>
+							<td class=fielddesc>The identifier of the group to which the clients are to be transferred.</td>
+						</tr>
+						<tr class=alt>
+							<td>clients</td>
+						</tr>
+						<tr>
+							<td class=fielddesc>Identifiers of all clients who need to be transferred
+							</td>
+						</tr>
+						<tr class=alt>
+							<td>inheritDestinationGroupLoanOfficer</td>
+						</tr>
+						<tr>
+							<td class=fielddesc>Flag specifies if the transferred clients (and all their active loans)
+							should be linked to the assigned loan officer for the group
+							</td>
+						</tr>
+						<tr class=alt>
+							<td>transferActiveLoans</td>
+						</tr>
+						<tr>
+							<td class=fielddesc>Flag specifies if transfers should proceed when active loans are encountered.
+							If set to true, the schedules of the actives loans are updated to match that meeting schedule
+							of the destination Group
+							</td>
+						</tr>
+					</table>
+					<br/>
+			        <table class=matrixHeading>
+						<tr class="matrixHeadingBG">
+							<td><div class="mifosXHeading2">Mandatory Fields</div></td>
+						</tr>
+						<tr class=alt>
+							<td>destinationGroupId, clients</td>
+						</tr>
+					</table>
+					<br/>
+					<table class=matrixHeading>
+						<tr class="matrixHeadingBG">
+							<td><div class="mifosXHeading2">Optional Fields</div></td>
+						</tr>
+						<tr class=alt>
+							<td>inheritDestinationGroupLoanOfficer (defaults to true), transferActiveLoans (defaults to true)</td>
+						</tr>
+					</table>
+
+			       
+			    </div>
+
+
+			    <div class="method-example">
+
+			        <code class="method-declaration">POST https://Domain Name/api/v1/groups/{groupId}?command=transferClients</code>
+			        <code class="method-request">POST groups/1?command=transferClients
+Content-Type: application/json
+Request Body:
+{
+  destinationGroupId:2,
+  clients:[{id:1}]
+}
+					</code>
+	        		<code class="method-response">
+{
+   "resourceId": 1
+}
+
+
+			  		</code>
+			    </div>
+			</div>
 			<a id="groups_retrieve" name="groups_retrieve" class="old-syle-anchor">&nbsp;</a>
 			<div class="method-section">
 				<div class="method-description">
@@ -18155,6 +18309,14 @@ GET https://DomainName/api/v1/search?query=000000111
 					<td>clients/{clientId}/accounts</td>
 					<td></td>
 					<td><a href="#clients_loansummary">Retrieve client accounts overview</a></td>
+					<td></td>
+					<td></td>
+				</tr>
+				<tr>
+					<td></td>
+					<td>clients/{clientId}?command=transfer</td>
+					<td><a href="#clients_transfer">Transfer Client</a></td>
+					<td></td>
 					<td></td>
 					<td></td>
 				</tr>

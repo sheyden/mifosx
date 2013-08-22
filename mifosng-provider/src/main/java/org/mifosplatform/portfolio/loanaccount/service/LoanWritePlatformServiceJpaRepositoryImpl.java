@@ -39,7 +39,7 @@ import org.mifosplatform.portfolio.calendar.domain.Calendar;
 import org.mifosplatform.portfolio.calendar.domain.CalendarEntityType;
 import org.mifosplatform.portfolio.calendar.domain.CalendarInstance;
 import org.mifosplatform.portfolio.calendar.domain.CalendarInstanceRepository;
-import org.mifosplatform.portfolio.calendar.service.CalendarHelper;
+import org.mifosplatform.portfolio.calendar.service.CalendarUtils;
 import org.mifosplatform.portfolio.charge.domain.Charge;
 import org.mifosplatform.portfolio.charge.domain.ChargeRepositoryWrapper;
 import org.mifosplatform.portfolio.charge.exception.LoanChargeCannotBeDeletedException;
@@ -241,9 +241,9 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
                 if (repaymentScheduleDetails != null) {// Not expecting to be
                                                        // null
                     final Integer repayEvery = repaymentScheduleDetails.getRepayEvery();
-                    final String frequency = CalendarHelper.getMeetingFrequencyFromPeriodFrequencyType(repaymentScheduleDetails
+                    final String frequency = CalendarUtils.getMeetingFrequencyFromPeriodFrequencyType(repaymentScheduleDetails
                             .getRepaymentPeriodFrequencyType());
-                    calculatedRepaymentsStartingFromDate = CalendarHelper.getFirstRepaymentMeetingDate(calendar, actualDisbursementDate,
+                    calculatedRepaymentsStartingFromDate = CalendarUtils.getFirstRepaymentMeetingDate(calendar, actualDisbursementDate,
                             repayEvery, frequency);
                 }
             }
@@ -439,10 +439,10 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
 
         final Money transactionAmountAsMoney = Money.of(loan.getCurrency(), transactionAmount);
         final PaymentDetail paymentDetail = this.paymentDetailWritePlatformService.createPaymentDetail(command, changes);
-        LoanTransaction newTransactionDetail = LoanTransaction.repayment(transactionAmountAsMoney, paymentDetail, transactionDate,
-                txnExternalId);
+        LoanTransaction newTransactionDetail = LoanTransaction.repayment(loan.getOffice(), transactionAmountAsMoney, paymentDetail,
+                transactionDate, txnExternalId);
         if (transactionToAdjust.isInterestWaiver()) {
-            newTransactionDetail = LoanTransaction.waiver(loan, transactionAmountAsMoney, transactionDate);
+            newTransactionDetail = LoanTransaction.waiver(loan.getOffice(), loan, transactionAmountAsMoney, transactionDate);
         }
 
         final boolean allowTransactionsOnHoliday = this.configurationDomainService.allowTransactionsOnHolidayEnabled();
@@ -529,7 +529,8 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
         final List<Long> existingReversedTransactionIds = new ArrayList<Long>();
 
         final Money transactionAmountAsMoney = Money.of(loan.getCurrency(), transactionAmount);
-        final LoanTransaction waiveInterestTransaction = LoanTransaction.waiver(loan, transactionAmountAsMoney, transactionDate);
+        final LoanTransaction waiveInterestTransaction = LoanTransaction.waiver(loan.getOffice(), loan, transactionAmountAsMoney,
+                transactionDate);
 
         final ChangedTransactionDetail changedTransactionDetail = loan.waiveInterest(waiveInterestTransaction,
                 defaultLoanLifecycleStateMachine(), existingTransactionIds, existingReversedTransactionIds);
@@ -930,6 +931,7 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
     public CommandProcessingResult bulkLoanReassignment(final JsonCommand command) {
 
         this.context.authenticatedUser();
+        this.loanEventApiJsonValidator.validateForBulkLoanReassignment(command.json());
 
         final Long fromLoanOfficerId = command.longValueOfParameterNamed("fromLoanOfficerId");
         final Long toLoanOfficerId = command.longValueOfParameterNamed("toLoanOfficerId");
@@ -950,7 +952,6 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
             loan.reassignLoanOfficer(toLoanOfficer, dateOfLoanOfficerAssignment);
             this.loanRepository.save(loan);
         }
-
         this.loanRepository.flush();
 
         return new CommandProcessingResultBuilder() //

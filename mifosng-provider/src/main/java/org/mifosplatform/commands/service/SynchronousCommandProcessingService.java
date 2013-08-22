@@ -170,6 +170,8 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
                 handler = this.applicationContext.getBean("assignClientStaffCommandHandler", NewCommandSourceHandler.class);
             } else if (wrapper.isClientClose()) {
                 handler = this.applicationContext.getBean("closeClientCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isClientTransfer()) {
+                handler = this.applicationContext.getBean("transferClientBetweenBranchesCommandHandler", NewCommandSourceHandler.class);
             } else {
                 throw new UnsupportedCommandException(wrapper.commandName());
             }
@@ -452,7 +454,9 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
                 handler = this.applicationContext.getBean("updateGroupRoleCommandHandler", NewCommandSourceHandler.class);
             }  else if (wrapper.isAssignStaff()) {
                 handler = this.applicationContext.getBean("assignGroupStaffCommandHandler", NewCommandSourceHandler.class);
-            }else {
+            } else if (wrapper.isTransferClientsBetweenGroups()) {
+                handler = this.applicationContext.getBean("transferClientsBetweenGroupsCommandHandler", NewCommandSourceHandler.class);
+            } else {
                 throw new UnsupportedCommandException(wrapper.commandName());
             }
         } else if (wrapper.isCenterResource()) {
@@ -519,6 +523,18 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
         } else if (wrapper.isSchedulerResource()) {
             if (wrapper.isUpdate()) {
                 handler = this.applicationContext.getBean("updateJobDetailCommandhandler", NewCommandSourceHandler.class);
+            } else {
+                throw new UnsupportedCommandException(wrapper.commandName());
+            }
+        } else if (wrapper.isMeetingResource()) {
+            if (wrapper.isCreate()) {
+                handler = this.applicationContext.getBean("createMeetingCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isUpdate()) {
+                handler = this.applicationContext.getBean("updateMeetingCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isDelete()) {
+                handler = this.applicationContext.getBean("deleteMeetingCommandHandler", NewCommandSourceHandler.class);
+            } else if (wrapper.isSaveOrUpdateAttendance()) {
+                handler = this.applicationContext.getBean("updateMeetingAttendanceCommandHandler", NewCommandSourceHandler.class);
             } else {
                 throw new UnsupportedCommandException(wrapper.commandName());
             }
