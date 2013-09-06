@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.LocalDate;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -32,9 +33,12 @@ import org.mifosplatform.portfolio.client.domain.Client;
 import org.mifosplatform.portfolio.client.exception.ClientNotActiveException;
 import org.mifosplatform.portfolio.group.domain.Group;
 import org.mifosplatform.portfolio.group.exception.GroupNotActiveException;
+import org.mifosplatform.portfolio.note.domain.Note;
+import org.mifosplatform.portfolio.note.domain.NoteRepository;
 import org.mifosplatform.portfolio.paymentdetail.domain.PaymentDetail;
 import org.mifosplatform.portfolio.paymentdetail.service.PaymentDetailWritePlatformService;
 import org.mifosplatform.portfolio.savings.SavingsApiConstants;
+import org.mifosplatform.portfolio.savings.data.SavingsAccountTransactionDTO;
 import org.mifosplatform.portfolio.savings.data.SavingsAccountTransactionDataValidator;
 import org.mifosplatform.portfolio.savings.domain.SavingsAccount;
 import org.mifosplatform.portfolio.savings.domain.SavingsAccountAssembler;
@@ -62,6 +66,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
     private final ApplicationCurrencyRepositoryWrapper applicationCurrencyRepositoryWrapper;
     private final JournalEntryWritePlatformService journalEntryWritePlatformService;
     private final SavingsAccountDomainService savingsAccountDomainService;
+    private final NoteRepository noteRepository;
 
     @Autowired
     public SavingsAccountWritePlatformServiceJpaRepositoryImpl(final PlatformSecurityContext context,
@@ -72,7 +77,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
             final PaymentDetailWritePlatformService paymentDetailWritePlatformService,
             final ApplicationCurrencyRepositoryWrapper applicationCurrencyRepositoryWrapper,
             final JournalEntryWritePlatformService journalEntryWritePlatformService,
-            final SavingsAccountDomainService savingsAccountDomainService) {
+            final SavingsAccountDomainService savingsAccountDomainService, final NoteRepository noteRepository) {
         this.context = context;
         this.savingAccountRepository = savingAccountRepository;
         this.savingsAccountTransactionRepository = savingsAccountTransactionRepository;
@@ -82,6 +87,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
         this.applicationCurrencyRepositoryWrapper = applicationCurrencyRepositoryWrapper;
         this.journalEntryWritePlatformService = journalEntryWritePlatformService;
         this.savingsAccountDomainService = savingsAccountDomainService;
+        this.noteRepository = noteRepository;
     }
 
     @Transactional
@@ -173,7 +179,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
         checkClientOrGroupActive(account);
 
         SavingsAccountTransaction withdrawal = this.savingsAccountDomainService.handleWithdrawal(account, fmt, transactionDate,
-                transactionAmount, paymentDetail);
+                transactionAmount, paymentDetail, true);
 
         return new CommandProcessingResultBuilder() //
                 .withEntityId(withdrawal.getId()) //
@@ -302,7 +308,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
             account.calculateInterestUsing(mc, today);
         }
         account.validateAccountBalanceDoesNotBecomeNegative(SavingsApiConstants.undoTransactionAction);
-
+        account.activateAccountBasedOnBalance();
         postJournalEntries(account, newTransactionIds, reversedTransactionIds);
 
         return new CommandProcessingResultBuilder() //
@@ -340,13 +346,23 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
 
         final MathContext mc = new MathContext(10, RoundingMode.HALF_EVEN);
         account.undoTransaction(transactionId, existingReversedTransactionIds);
+        
+        //for undo withdrawal fee
+        SavingsAccountTransaction nextSavingsAccountTransaction = this.savingsAccountTransactionRepository.findOneByIdAndSavingsAccountId(
+                transactionId+1, savingsId);
+        if(nextSavingsAccountTransaction.isWithdrawalFeeAndNotReversed()){
+            account.undoTransaction(transactionId+1, existingReversedTransactionIds);
+        }
+        
         SavingsAccountTransaction transaction = null;
         if (savingsAccountTransaction.isDeposit()) {
-            transaction = account.deposit(fmt, transactionDate, transactionAmount, existingTransactionIds, existingReversedTransactionIds,
-                    paymentDetail);
+            SavingsAccountTransactionDTO transactionDTO = new SavingsAccountTransactionDTO(fmt, transactionDate, transactionAmount, 
+                    existingTransactionIds, existingReversedTransactionIds,paymentDetail, false);
+            transaction = account.deposit(transactionDTO);
         } else {
-            transaction = account.withdraw(fmt, transactionDate, transactionAmount, existingTransactionIds, existingReversedTransactionIds,
-                    paymentDetail);
+            SavingsAccountTransactionDTO transactionDTO = new SavingsAccountTransactionDTO(fmt, transactionDate, transactionAmount, 
+                    existingTransactionIds, existingReversedTransactionIds, paymentDetail, false);
+            transaction = account.withdraw(transactionDTO , true);
         }
         final Long newtransactionId = saveTransactionToGenerateTransactionId(transaction);
 
@@ -357,6 +373,7 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
             account.calculateInterestUsing(mc, today);
         }
         account.validateAccountBalanceDoesNotBecomeNegative(SavingsApiConstants.adjustTransactionAction);
+        account.activateAccountBasedOnBalance();
         postJournalEntries(account, existingTransactionIds, existingReversedTransactionIds);
         return new CommandProcessingResultBuilder() //
                 .withEntityId(newtransactionId) //
@@ -388,5 +405,32 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
         if (group != null) {
             if (group.isNotActive()) { throw new GroupNotActiveException(group.getId()); }
         }
+    }
+
+    @Override
+    public CommandProcessingResult close(Long savingsId, JsonCommand command) {
+        final AppUser user = this.context.authenticatedUser();
+
+        this.savingsAccountTransactionDataValidator.validateClosing(command);
+        final SavingsAccount account = this.savingAccountAssembler.assembleFrom(savingsId);
+        final Map<String, Object> changes = account.close(user, command, DateUtils.getLocalDateOfTenant());
+        if (!changes.isEmpty()) {
+            this.savingAccountRepository.save(account);
+            final String noteText = command.stringValueOfParameterNamed("note");
+            if (StringUtils.isNotBlank(noteText)) {
+                final Note note = Note.savingNote(account, noteText);
+                changes.put("note", noteText);
+                this.noteRepository.save(note);
+            }
+
+        }
+        return new CommandProcessingResultBuilder() //
+                .withEntityId(savingsId) //
+                .withOfficeId(account.officeId()) //
+                .withClientId(account.clientId()) //
+                .withGroupId(account.groupId()) //
+                .withSavingsId(savingsId) //
+                .with(changes) //
+                .build();
     }
 }

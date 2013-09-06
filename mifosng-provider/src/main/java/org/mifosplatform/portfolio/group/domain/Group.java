@@ -31,6 +31,7 @@ import javax.persistence.TemporalType;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.LocalDate;
 import org.joda.time.format.DateTimeFormatter;
+import org.mifosplatform.infrastructure.codes.domain.CodeValue;
 import org.mifosplatform.infrastructure.core.api.JsonCommand;
 import org.mifosplatform.infrastructure.core.data.ApiParameterError;
 import org.mifosplatform.infrastructure.core.exception.PlatformApiDataValidationException;
@@ -41,6 +42,7 @@ import org.mifosplatform.portfolio.client.domain.Client;
 import org.mifosplatform.portfolio.group.api.GroupingTypesApiConstants;
 import org.mifosplatform.portfolio.group.exception.ClientExistInGroupException;
 import org.mifosplatform.portfolio.group.exception.ClientNotInGroupException;
+import org.mifosplatform.portfolio.group.exception.InvalidGroupStateTransitionException;
 import org.springframework.data.jpa.domain.AbstractPersistable;
 
 import com.google.common.collect.Sets;
@@ -95,6 +97,14 @@ public final class Group extends AbstractPersistable<Long> {
     @ManyToMany
     @JoinTable(name = "m_group_client", joinColumns = @JoinColumn(name = "group_id"), inverseJoinColumns = @JoinColumn(name = "client_id"))
     private Set<Client> clientMembers;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "closure_reason_cv_id", nullable = true)
+    private CodeValue closureReason;
+    
+    @Column(name = "closedon_date", nullable = true)
+    @Temporal(TemporalType.DATE)
+    private Date closureDate;
 
     public Group() {
         this.name = null;
@@ -110,7 +120,8 @@ public final class Group extends AbstractPersistable<Long> {
         LocalDate groupActivationDate = null;
         if (active) {
             status = GroupingTypeStatus.ACTIVE;
-            groupActivationDate = activationDate;//set activation date only if group is made active
+            groupActivationDate = activationDate;// set activation date only if
+                                                 // group is made active
         }
 
         return new Group(office, staff, parent, groupLevel, name, externalId, status, groupActivationDate, clientMembers, groupMembers);
@@ -309,8 +320,8 @@ public final class Group extends AbstractPersistable<Long> {
     public List<String> updateClientMembersIfDifferent(final Set<Client> clientMembersSet) {
         List<String> differences = new ArrayList<String>();
         if (!clientMembersSet.equals(this.clientMembers)) {
-            Set<Client> diffClients = Sets.symmetricDifference(clientMembersSet, this.clientMembers);
-            String[] diffClientsIds = getClientIds(diffClients);
+            final Set<Client> diffClients = Sets.symmetricDifference(clientMembersSet, this.clientMembers);
+            final String[] diffClientsIds = getClientIds(diffClients);
             if (diffClientsIds != null) {
                 differences = Arrays.asList(diffClientsIds);
             }
@@ -321,35 +332,33 @@ public final class Group extends AbstractPersistable<Long> {
     }
 
     public List<String> associateClients(final Set<Client> clientMembersSet) {
-        List<String> differences = new ArrayList<String>();
-        for (Client client : clientMembersSet) {
-            if(this.hasClientAsMember(client)){
-                throw new ClientExistInGroupException(client.getId(), this.getId());
-            }
+        final List<String> differences = new ArrayList<String>();
+        for (final Client client : clientMembersSet) {
+            if (hasClientAsMember(client)) { throw new ClientExistInGroupException(client.getId(), getId()); }
             this.clientMembers.add(client);
             differences.add(client.getId().toString());
         }
 
         return differences;
     }
-    
+
     public List<String> disassociateClients(final Set<Client> clientMembersSet) {
-        List<String> differences = new ArrayList<String>();
-        for (Client client : clientMembersSet) {
-            if(this.hasClientAsMember(client)){
+        final List<String> differences = new ArrayList<String>();
+        for (final Client client : clientMembersSet) {
+            if (hasClientAsMember(client)) {
                 this.clientMembers.remove(client);
                 differences.add(client.getId().toString());
-            }else{
-                throw new ClientNotInGroupException(client.getId(), this.getId());
-            }            
+            } else {
+                throw new ClientNotInGroupException(client.getId(), getId());
+            }
         }
 
         return differences;
-    } 
-    
+    }
+
     private String[] getClientIds(final Set<Client> clients) {
-        String[] clientIds = new String[clients.size()];
-        Iterator<Client> it = clients.iterator();
+        final String[] clientIds = new String[clients.size()];
+        final Iterator<Client> it = clients.iterator();
         for (int i = 0; it.hasNext(); i++) {
             clientIds[i] = it.next().getId().toString();
         }
@@ -384,12 +393,66 @@ public final class Group extends AbstractPersistable<Long> {
     public boolean isCenter() {
         return this.groupLevel.isCenter();
     }
+
+    public boolean isTransferInProgress() {
+        return GroupingTypeStatus.fromInt(this.status).isTransferInProgress();
+    }
     
-    public boolean isChildClient(final Long clientId){
+    public boolean isTransferOnHold() {
+        return GroupingTypeStatus.fromInt(this.status).isTransferOnHold();
+    }
+
+    public boolean isTransferInProgressOrOnHold() {
+        return isTransferInProgress() || isTransferOnHold();
+    }
+
+    public boolean isChildClient(final Long clientId) {
         if (clientId != null && this.clientMembers != null && !this.clientMembers.isEmpty()) {
-            for (Client client : this.clientMembers) {
-                if(client.getId().equals(clientId)) return true;
+            for (final Client client : this.clientMembers) {
+                if (client.getId().equals(clientId)) {
+                    return true;
+                }
             }
+        }
+        return false;
+    }
+
+    public boolean isChildGroup(){
+        return (this.parent == null) ? false : true;
+
+    }
+    
+    public boolean isClosed(){
+        return GroupingTypeStatus.fromInt(this.status).isClosed();
+    }
+    
+    public void close(final CodeValue closureReason, final LocalDate closureDate){
+        
+        if (this.isClosed()) {
+            final String errorMessage = "Group with identifier " + this.getId() + " is alread closed.";
+            throw new InvalidGroupStateTransitionException(this.groupLevel.getLevelName(), "close", "already.closed", errorMessage, this.getId());
+        }
+        
+        if (this.isNotPending() && this.getActivationLocalDate().isAfter(closureDate)) {
+            final String errorMessage = "The Group closure Date " + closureDate + " cannot be before the group Activation Date " + this.getActivationLocalDate() + ".";
+            throw new InvalidGroupStateTransitionException(this.groupLevel.getLevelName(), "close", "date.cannot.before.group.actvation.date", errorMessage, closureDate, this.getActivationLocalDate());
+        }
+        
+        this.closureReason = closureReason;
+        this.closureDate = closureDate.toDate();
+        this.status = GroupingTypeStatus.CLOSED.getValue();
+    }
+    
+    public boolean hasActiveClients(){
+        for (Client client : this.clientMembers) {
+            if(!client.isClosed()) return true;
+        }
+        return false;
+    }
+    
+    public boolean hasActiveGroups(){
+        for(Group group : this.groupMembers){
+            if(!group.isClosed()) return true;
         }
         return false;
     }

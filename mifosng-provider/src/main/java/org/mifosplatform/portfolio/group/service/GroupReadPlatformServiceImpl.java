@@ -7,7 +7,9 @@ package org.mifosplatform.portfolio.group.service;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 import org.mifosplatform.infrastructure.codes.data.CodeValueData;
@@ -206,17 +208,17 @@ public class GroupReadPlatformServiceImpl implements GroupReadPlatformService {
     }
 
     @Override
-    public Collection<GroupGeneralData> retrieveGroupsForLookup(final Long officeId, final Long groupId) {
+    public Collection<GroupGeneralData> retrieveGroupsForLookup(final Long officeId) {
         this.context.authenticatedUser();
         GroupLookupDataMapper rm = new GroupLookupDataMapper();
-        String sql = "Select " + rm.schema() + " where g.office_id=? and g.id !=?";
-        return this.jdbcTemplate.query(sql, rm, new Object[] { officeId, groupId });
+        String sql = "Select " + rm.schema() + " and g.office_id=?";
+        return this.jdbcTemplate.query(sql, rm, new Object[] { officeId });
     }
 
     private static final class GroupLookupDataMapper implements RowMapper<GroupGeneralData> {
 
         public final String schema() {
-            return "g.id as id, g.display_name as displayName from m_group g";
+            return "g.id as id, g.display_name as displayName from m_group g where g.level_id = 2 ";
         }
 
         @Override
@@ -226,4 +228,12 @@ public class GroupReadPlatformServiceImpl implements GroupReadPlatformService {
             return GroupGeneralData.lookup(id, displayName);
         }
     }
+
+    @Override
+    public GroupGeneralData retrieveGroupWithClosureReasons() {
+        final List<CodeValueData> closureReasons = new ArrayList<CodeValueData>(
+                codeValueReadPlatformService.retrieveCodeValuesByCode(GroupingTypesApiConstants.GROUP_CLOSURE_REASON));
+        return GroupGeneralData.withClosureReasons(closureReasons);
+    }
+    
 }

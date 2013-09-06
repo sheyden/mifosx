@@ -1281,7 +1281,7 @@ public class Loan extends AbstractPersistable<Long> {
         return actualChanges;
     }
 
-    private Collection<Long> findExistingTransactionIds() {
+    public Collection<Long> findExistingTransactionIds() {
 
         final Collection<Long> ids = new ArrayList<Long>();
 
@@ -1292,7 +1292,7 @@ public class Loan extends AbstractPersistable<Long> {
         return ids;
     }
 
-    private Collection<Long> findExistingReversedTransactionIds() {
+    public Collection<Long> findExistingReversedTransactionIds() {
 
         final Collection<Long> ids = new ArrayList<Long>();
 
@@ -1528,6 +1528,42 @@ public class Loan extends AbstractPersistable<Long> {
         return changedTransactionDetail;
     }
 
+    public void makeRefund(final LoanTransaction loanTransaction, final LoanLifecycleStateMachine loanLifecycleStateMachine,
+            final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds,
+            final boolean allowTransactionsOnHoliday, final List<Holiday> holidays, final WorkingDays workingDays,
+            final boolean allowTransactionsOnNonWorkingDay) {
+
+        validateRepaymentDateIsOnHoliday(loanTransaction.getTransactionDate(), allowTransactionsOnHoliday, holidays);
+        validateRepaymentDateIsOnNonWorkingDay(loanTransaction.getTransactionDate(), workingDays, allowTransactionsOnNonWorkingDay);
+
+        existingTransactionIds.addAll(findExistingTransactionIds());
+        existingReversedTransactionIds.addAll(findExistingReversedTransactionIds());
+
+        if (status().isOverpaid()) {
+            if (this.totalOverpaid.compareTo(loanTransaction.getAmount(getCurrency()).getAmount()) == -1) {
+                final String errorMessage = "The refund amount must be less than or equal to overpaid amount ";
+                throw new InvalidLoanStateTransitionException("transaction", "is.exceeding.overpaid.amount", errorMessage, totalOverpaid,
+                        loanTransaction.getAmount(getCurrency()).getAmount());
+            } else if (!isAfterLatRepayment(loanTransaction, loanTransactions)) {
+                final String errorMessage = "Transfer funds is allowed only after last repayment date";
+                throw new InvalidLoanStateTransitionException("transaction", "is.not.after.repayment.date", errorMessage);
+            }
+        } else {
+            final String errorMessage = "Transfer funds is allowed only for loan accounts with overpaid status ";
+            throw new InvalidLoanStateTransitionException("transaction", "is.not.a.overpaid.loan", errorMessage);
+        }
+        this.totalOverpaid = this.totalOverpaid.subtract(loanTransaction.getAmount(getCurrency()).getAmount());
+        if (this.totalOverpaid.compareTo(BigDecimal.ZERO) == 0) {
+            handleLoanRepaymentInFull(loanTransaction.getTransactionDate(), loanLifecycleStateMachine);
+        }
+        loanTransaction.updateLoan(this);
+
+        if (loanTransaction.isNotZero(loanCurrency())) {
+            this.loanTransactions.add(loanTransaction);
+        }
+
+    }
+
     private ChangedTransactionDetail handleRepaymentOrWaiverTransaction(final LoanTransaction loanTransaction,
             final LoanLifecycleStateMachine loanLifecycleStateMachine, final LoanTransaction adjustedTransaction) {
 
@@ -1654,6 +1690,22 @@ public class Loan extends AbstractPersistable<Long> {
         }
 
         return isChronologicallyLatestRepaymentOrWaiver;
+    }
+
+    private boolean isAfterLatRepayment(final LoanTransaction loanTransaction, final List<LoanTransaction> loanTransactions) {
+
+        boolean isAfterLatRepayment = true;
+
+        final LocalDate currentTransactionDate = loanTransaction.getTransactionDate();
+        for (final LoanTransaction previousTransaction : loanTransactions) {
+            if (previousTransaction.isRepayment() && previousTransaction.isNotReversed()) {
+                if (currentTransactionDate.isBefore(previousTransaction.getTransactionDate())) {
+                    isAfterLatRepayment = false;
+                    break;
+                }
+            }
+        }
+        return isAfterLatRepayment;
     }
 
     private boolean isChronologicallyLatestTransaction(final LoanTransaction loanTransaction, final List<LoanTransaction> loanTransactions) {
@@ -1794,7 +1846,7 @@ public class Loan extends AbstractPersistable<Long> {
 
     private Money calculateTotalOverpayment() {
 
-        final Money totalPaidInRepayments = getTotalPaidInRepayments();
+         Money totalPaidInRepayments = getTotalPaidInRepayments();
 
         final MonetaryCurrency currency = loanCurrency();
         Money cumulativeTotalPaidOnInstallments = Money.zero(currency);
@@ -1807,6 +1859,12 @@ public class Loan extends AbstractPersistable<Long> {
                     .plus(scheduledRepayment.getFeeChargesPaid(currency)).plus(scheduledRepayment.getPenaltyChargesPaid(currency));
 
             cumulativeTotalWaivedOnInstallments = cumulativeTotalWaivedOnInstallments.plus(scheduledRepayment.getInterestWaived(currency));
+        }
+
+        for (LoanTransaction loanTransaction : this.loanTransactions) {
+            if (loanTransaction.isRefund() && !loanTransaction.isReversed()) {
+                totalPaidInRepayments = totalPaidInRepayments.minus(loanTransaction.getAmount(currency));
+            }
         }
 
         // if total paid in transactions doesnt match repayment schedule then
@@ -2011,7 +2069,7 @@ public class Loan extends AbstractPersistable<Long> {
         return hasDisbursementTransaction();
     }
 
-    private boolean isClosed() {
+    public boolean isClosed() {
         return status().isClosed() || isCancelled();
     }
 
@@ -2428,22 +2486,16 @@ public class Loan extends AbstractPersistable<Long> {
                 }
 
                 if (isHolidayEnabled) {
-                    // reset repayment date with new meeting date
-                    newRepaymentDate = CalendarUtils.getNewRepaymentMeetingDate(recuringRule, meetingStartDate, oldDueDate,
-                            loanRepaymentInterval, frequency, workingDays);
-                    if (isHolidayEnabled) {
-                        newRepaymentDate = HolidayUtil.getRepaymentRescheduleDateToIfHoliday(newRepaymentDate, holidays);
-                    }
-
-                    loanRepaymentScheduleInstallment.updateDueDate(newRepaymentDate);
-                    // reset from date to get actual daysInPeriod
-                    loanRepaymentScheduleInstallment.updateFromDate(tmpFromDate);
-                    tmpFromDate = newRepaymentDate;// update with new repayment
-                                                   // date
-                } else {
-                    tmpFromDate = oldDueDate;
+                    newRepaymentDate = HolidayUtil.getRepaymentRescheduleDateToIfHoliday(newRepaymentDate, holidays);
                 }
-
+                
+                loanRepaymentScheduleInstallment.updateDueDate(newRepaymentDate);
+                // reset from date to get actual daysInPeriod
+                loanRepaymentScheduleInstallment.updateFromDate(tmpFromDate);
+                tmpFromDate = newRepaymentDate;// update with new repayment
+                                   // date
+            }else {
+                tmpFromDate = oldDueDate;
             }
         }
     }
@@ -2577,6 +2629,14 @@ public class Loan extends AbstractPersistable<Long> {
 
     public Integer getTermPeriodFrequencyType() {
         return this.termPeriodFrequencyType;
+    }
+
+    public List<LoanTransaction> getLoanTransactions() {
+        return this.loanTransactions;
+    }
+
+    public void setLoanStatus(Integer loanStatus) {
+        this.loanStatus = loanStatus;
     }
 
     public void validateExpectedDisbursementForHolidayAndNonWorkingDay(final WorkingDays workingDays,
