@@ -29,12 +29,12 @@ public class CashBasedAccountingProcessorForSavings implements AccountingProcess
     @Override
     public void createJournalEntriesForSavings(SavingsDTO savingsDTO) {
         final GLClosure latestGLClosure = this.helper.getLatestClosureByBranch(savingsDTO.getOfficeId());
-        final Office office = this.helper.getOfficeById(savingsDTO.getOfficeId());
         final Long savingsProductId = savingsDTO.getSavingsProductId();
         final Long savingsId = savingsDTO.getSavingsId();
         for (final SavingsTransactionDTO savingsTransactionDTO : savingsDTO.getNewSavingsTransactions()) {
             final Date transactionDate = savingsTransactionDTO.getTransactionDate();
             final String transactionId = savingsTransactionDTO.getTransactionId();
+            final Office office = this.helper.getOfficeById(savingsTransactionDTO.getOfficeId());
             final Long paymentTypeId = savingsTransactionDTO.getPaymentTypeId();
             final boolean isReversal = savingsTransactionDTO.isReversed();
             final BigDecimal amount = savingsTransactionDTO.getAmount();
@@ -69,6 +69,21 @@ public class CashBasedAccountingProcessorForSavings implements AccountingProcess
             else if (savingsTransactionDTO.getTransactionType().isFeeDeduction()) {
                 helper.createCashBasedJournalEntriesAndReversalsForSavings(office, CASH_ACCOUNTS_FOR_SAVINGS.SAVINGS_CONTROL,
                         CASH_ACCOUNTS_FOR_SAVINGS.INCOME_FROM_FEES, savingsProductId, paymentTypeId, savingsId, transactionId,
+                        transactionDate, amount, isReversal);
+            }
+
+            /** Handle Transfers proposal **/
+            else if (savingsTransactionDTO.getTransactionType().isInitiateTransfer()) {
+                helper.createCashBasedJournalEntriesAndReversalsForSavings(office, CASH_ACCOUNTS_FOR_SAVINGS.SAVINGS_CONTROL,
+                        CASH_ACCOUNTS_FOR_SAVINGS.TRANSFERS_SUSPENSE, savingsProductId, paymentTypeId, savingsId, transactionId,
+                        transactionDate, amount, isReversal);
+            }
+
+            /** Handle Transfer Withdrawal or Acceptance **/
+            else if (savingsTransactionDTO.getTransactionType().isWithdrawTransfer()
+                    || savingsTransactionDTO.getTransactionType().isApproveTransfer()) {
+                helper.createCashBasedJournalEntriesAndReversalsForSavings(office, CASH_ACCOUNTS_FOR_SAVINGS.TRANSFERS_SUSPENSE,
+                        CASH_ACCOUNTS_FOR_SAVINGS.SAVINGS_CONTROL, savingsProductId, paymentTypeId, savingsId, transactionId,
                         transactionDate, amount, isReversal);
             }
 
