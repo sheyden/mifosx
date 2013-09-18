@@ -489,9 +489,21 @@ public class CommandWrapperBuilder {
         this.loanId = loanId;
         this.href = "/loans/" + loanId + "/charges/" + loanChargeId;
         return this;
-
     }
-
+    
+    public CommandWrapperBuilder payLoanCharge(final Long loanId, final Long loanChargeId) {
+        this.actionName = "PAY";
+        this.entityName = "LOANCHARGE";
+        this.entityId = loanChargeId;
+        this.loanId = loanId;
+        if(loanChargeId == null){
+            this.href = "/loans/" + loanId;
+        }else{
+            this.href = "/loans/" + loanId + "/charges/" + loanChargeId; 
+        }
+        return this;
+    }
+    
     public CommandWrapperBuilder deleteLoanCharge(final Long loanId, final Long loanChargeId) {
         this.actionName = "DELETE";
         this.entityName = "LOANCHARGE";
@@ -844,7 +856,7 @@ public class CommandWrapperBuilder {
         this.href = "/savingsaccounts/" + accountId + "?command=activate";
         return this;
     }
-    
+
     public CommandWrapperBuilder closeSavingsAccountApplication(final Long accountId) {
         this.actionName = "CLOSE";
         this.entityName = "SAVINGSACCOUNT";
@@ -1076,7 +1088,7 @@ public class CommandWrapperBuilder {
         this.href = "/groups/" + groupId + "?command=assignStaff";
         return this;
     }
-    
+
     public CommandWrapperBuilder closeGroup(final Long groupId) {
         this.actionName = "CLOSE";
         this.entityName = "GROUP";
@@ -1085,7 +1097,7 @@ public class CommandWrapperBuilder {
         this.href = "/groups/" + groupId + "?command=close";
         return this;
     }
-    
+
     public CommandWrapperBuilder createCollateral(final Long loanId) {
         this.actionName = "CREATE";
         this.entityName = "COLLATERAL";
@@ -1162,7 +1174,7 @@ public class CommandWrapperBuilder {
         this.href = "/centers/" + centerId + "?command=saveCollectionSheet";
         return this;
     }
-    
+
     public CommandWrapperBuilder closeCenter(final Long centerId) {
         this.actionName = "CLOSE";
         this.entityName = "CENTER";
@@ -1195,7 +1207,7 @@ public class CommandWrapperBuilder {
         this.href = "/accountingrules/" + accountingRuleId;
         return this;
     }
-    
+
     public CommandWrapperBuilder updateTaxonomyMapping(final Long mappingId) {
         this.actionName = "UPDATE";
         this.entityName = "XBRLMAPPING";
@@ -1329,6 +1341,13 @@ public class CommandWrapperBuilder {
         this.supportedEntityType = supportedEntityType;
         this.supportedEntityId = supportedEntityId;
         this.href = "/" + supportedEntityType + "/" + supportedEntityId + "/meetings/" + entityId + "?command=saveOrUpdateAttendance";
+        return this;
+    }
+
+    public CommandWrapperBuilder updateCache() {
+        this.actionName = "UPDATE";
+        this.entityName = "CACHE";
+        this.href = "/cache";
         return this;
     }
 }
