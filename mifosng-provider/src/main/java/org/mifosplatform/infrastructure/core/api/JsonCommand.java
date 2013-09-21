@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.ObjectUtils;
@@ -23,10 +24,11 @@ import org.mifosplatform.infrastructure.security.service.PlatformPasswordEncoder
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.reflect.TypeToken;
 
 /**
  * Immutable representation of a command.
- *
+ * 
  * Wraps the provided JSON with convenience functions for extracting parameter
  * values and checking for changes against an existing value.
  */
@@ -68,7 +70,8 @@ public final class JsonCommand {
     public JsonCommand(final Long commandId, final String jsonCommand, final JsonElement parsedCommand,
             final FromJsonHelper fromApiJsonHelper, final String entityName, final Long resourceId, final Long subresourceId,
             final Long groupId, final Long clientId, final Long loanId, final Long savingsId, final Long codeId,
-            final String supportedEntityType, final Long supportedEntityId, final String transactionId, final String url, final Long productId) {
+            final String supportedEntityType, final Long supportedEntityId, final String transactionId, final String url,
+            final Long productId) {
         this.commandId = commandId;
         this.jsonCommand = jsonCommand;
         this.parsedCommand = parsedCommand;
@@ -311,6 +314,12 @@ public final class JsonCommand {
 
     public String stringValueOfParameterNamedAllowingNull(final String parameterName) {
         return this.fromApiJsonHelper.extractStringNamed(parameterName, this.parsedCommand);
+    }
+
+    public Map<String, String> mapValueOfParameterNamed(final String json) {
+    	final Type typeOfMap = new TypeToken<Map<String, String>>() {}.getType();
+    	final Map<String, String> value = this.fromApiJsonHelper.extractDataMap(typeOfMap, json);
+    	return value;
     }
 
     public boolean isChangeInBigDecimalParameterNamedDefaultingZeroToNull(final String parameterName, final BigDecimal existingValue) {
