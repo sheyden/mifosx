@@ -15,7 +15,7 @@ import org.mifosplatform.infrastructure.core.service.ThreadLocalContextUtil;
 import org.mifosplatform.infrastructure.jobs.annotation.CronTarget;
 import org.mifosplatform.infrastructure.jobs.service.JobName;
 import org.mifosplatform.portfolio.savings.data.SavingsAccountAnnualFeeData;
-import org.mifosplatform.portfolio.savings.service.SavingsAccountReadPlatformService;
+import org.mifosplatform.portfolio.savings.service.SavingsAccountChargeReadPlatformService;
 import org.mifosplatform.portfolio.savings.service.SavingsAccountWritePlatformService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,15 +31,15 @@ public class ScheduledJobRunnerServiceImpl implements ScheduledJobRunnerService 
 
     private final RoutingDataSourceServiceFactory dataSourceServiceFactory;
     private final SavingsAccountWritePlatformService savingsAccountWritePlatformService;
-    private final SavingsAccountReadPlatformService savingsAccountReadPlatformService;
+    private final SavingsAccountChargeReadPlatformService savingsAccountChargeReadPlatformService;
 
     @Autowired
     public ScheduledJobRunnerServiceImpl(final RoutingDataSourceServiceFactory dataSourceServiceFactory,
             final SavingsAccountWritePlatformService savingsAccountWritePlatformService,
-            final SavingsAccountReadPlatformService savingsAccountReadPlatformService) {
+            final SavingsAccountChargeReadPlatformService savingsAccountChargeReadPlatformService) {
         this.dataSourceServiceFactory = dataSourceServiceFactory;
         this.savingsAccountWritePlatformService = savingsAccountWritePlatformService;
-        this.savingsAccountReadPlatformService = savingsAccountReadPlatformService;
+        this.savingsAccountChargeReadPlatformService = savingsAccountChargeReadPlatformService;
     }
 
     @Transactional
@@ -198,27 +198,50 @@ public class ScheduledJobRunnerServiceImpl implements ScheduledJobRunnerService 
         logger.info(ThreadLocalContextUtil.getTenant().getName() + ": Results affected by update: " + result);
     }
 
-    @Transactional
     @Override
     @CronTarget(jobName = JobName.APPLY_ANNUAL_FEE_FOR_SAVINGS)
     public void applyAnnualFeeForSavings() {
 
-        final Collection<SavingsAccountAnnualFeeData> annualFeeData = this.savingsAccountReadPlatformService
-                .retrieveAccountsWithAnnualFeeDue();
+        final Collection<SavingsAccountAnnualFeeData> annualFeeData = this.savingsAccountChargeReadPlatformService
+                .retrieveChargesWithAnnualFeeDue();
 
         for (final SavingsAccountAnnualFeeData savingsAccountReference : annualFeeData) {
             try {
                 this.savingsAccountWritePlatformService.applyAnnualFee(savingsAccountReference.getId(),
-                        savingsAccountReference.getNextAnnualFeeDueDate());
+                        savingsAccountReference.getAccountId());
             } catch (final PlatformApiDataValidationException e) {
                 final List<ApiParameterError> errors = e.getErrors();
                 for (final ApiParameterError error : errors) {
                     logger.error("Apply annual fee failed for account:" + savingsAccountReference.getAccountNo() + " with message "
                             + error.getDeveloperMessage());
                 }
+            } catch (final Exception ex){
+                //need to handle this scenario
             }
         }
 
         logger.info(ThreadLocalContextUtil.getTenant().getName() + ": Savings accounts affected by update: " + annualFeeData.size());
     }
+
+    @Override
+    @CronTarget(jobName = JobName.PAY_DUE_SAVINGS_CHARGES)
+    public void applyDueChargesForSavings() {
+        final Collection<SavingsAccountAnnualFeeData> chargesDueData = this.savingsAccountChargeReadPlatformService
+                .retrieveChargesWithDue();
+        
+        for (final SavingsAccountAnnualFeeData savingsAccountReference : chargesDueData) {
+            try {
+                this.savingsAccountWritePlatformService.applyChargeDue(savingsAccountReference.getId(), savingsAccountReference.getAccountId());
+            } catch (final PlatformApiDataValidationException e) {
+                final List<ApiParameterError> errors = e.getErrors();
+                for (final ApiParameterError error : errors) {
+                    logger.error("Apply Charges due for savings failed for account:" + savingsAccountReference.getAccountNo() + " with message "
+                            + error.getDeveloperMessage());
+                }
+            }
+        }
+        
+        logger.info(ThreadLocalContextUtil.getTenant().getName() + ": Savings accounts affected by update: " + chargesDueData.size());
+    }
+   
 }

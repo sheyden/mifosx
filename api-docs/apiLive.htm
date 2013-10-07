@@ -90,7 +90,7 @@
 <body>
 	<div id="page-wrapper">
 		<div id="flybar">
-			<div id="nav-logo">1.10.2.RELEASE API</div>
+			<div id="nav-logo">1.11.0.RELEASE API</div>
 			<div class="flybar-nav">
 				<h2 class="flybar-button">Overview</h2>
 				<div class="flybar-menu-overview">
@@ -711,7 +711,8 @@
 							<tr class="alt">
 								<td><a href="#journalentries">Journal Entries</a></td>
 								<td>journalentries</td>
-								<td><a href="#journalentries_create">Create Journal Entries</a></td>
+								<td><a href="#journalentries_create">Create Journal Entries</a><br> 
+								<a href="#journalentries_updatebalance">Update Journal Entries Running Balance</a></td>
 								<td><a href="#journalentries_list">List Journal Entries</a></td>
 								<td></td>
 								<td></td>
@@ -8508,7 +8509,7 @@ GET https://DomainName/api/v1/loanproducts/{productId}
 						<tr class=alt>
 							<td>fundSourceAccountId, loanPortfolioAccountId, interestOnLoanAccountId, 
 								incomeFromFeeAccountId, incomeFromPenaltyAccountId, 
-								writeOffAccountId, transfersInSuspenseAccountId</td>
+								writeOffAccountId, transfersInSuspenseAccountId, overpaymentLiabilityAccountId</td>
 						</tr>
 						<tr class="matrixHeadingBG">
 							<td><div class="mifosXHeading2">Additional Mandatory Fields for Accrual(3) based accounting</div></td>
@@ -8517,7 +8518,7 @@ GET https://DomainName/api/v1/loanproducts/{productId}
 							<td>fundSourceAccountId, loanPortfolioAccountId, interestOnLoanAccountId, 
 								incomeFromFeeAccountId, incomeFromPenaltyAccountId, 
 								writeOffAccountId, receivableInterestAccountId, receivableFeeAccountId,
-								receivablePenaltyAccountId, transfersInSuspenseAccountId</td>
+								receivablePenaltyAccountId, transfersInSuspenseAccountId, overpaymentLiabilityAccountId</td>
 						</tr>
 					</table>
 				</div>
@@ -8583,6 +8584,7 @@ Request Body:
     "incomeFromPenaltyAccountId":"35",
     "writeOffAccountId":"41",
     "transfersInSuspenseAccountId":"4",
+    "overpaymentLiabilityAccountId":"2",
     "paymentChannelToFundSourceMappings": [
     {
       "paymentTypeId": "11",
@@ -8642,6 +8644,7 @@ Request Body:
     "interestOnLoanAccountId":"34",
     "incomeFromFeeAccountId":"37",
     "incomeFromPenaltyAccountId":"35",
+    "overpaymentLiabilityAccountId":"2",
     "writeOffAccountId":"41"
 }
 					</code>
@@ -9158,8 +9161,8 @@ Request Body:
 "toDate": "25 October 2013",
 "repaymentsRescheduledTo": "26 October 2013",
 "offices": [
-	"officeId":"1",
-	"officeId":"2"
+	{"officeId":"1"},
+	{"officeId":"2"}
 ]
 }
 				</code>
@@ -11120,6 +11123,21 @@ GET https://DomainName/api/v1/charges/template
            "id": 2,
            "code": "chargeTimeType.specifiedDueDate",
            "value": "Specified due date"
+       },
+       {
+       	    "id": 3,
+       	    "code": "chargeTimeType.savingsActivation",
+       	    "value": "Savings Activation"
+       },
+       {
+       	    "id": 5,
+       	    "code": "chargeTimeType.withdrawalFee",
+       	    "value": "Withdrawal Fee"
+       },
+       {
+       	    "id": 6,
+       	    "code": "chargeTimeType.annualFee",
+       	    "value": "Annual Fee"
        }
    ],
    "chargePaymetModeOptions":
@@ -12363,13 +12381,13 @@ Content-Type: application/json
             <table class=matrixHeading>
                 <tr class="matrixHeadingBG"><td><div class="mifosXHeading2">Mandatory Fields for Cash based accounting (accountingRule = 2)</div></td></tr>
                 <tr class=alt>
-                	<td>savingsReferenceAccountId,savingsControlAccountId, interestOnSavingsAccountId, incomeFromFeeAccountId, transfersInSuspenseAccountId</td>
+                	<td>savingsReferenceAccountId, savingsControlAccountId, interestOnSavingsAccountId, incomeFromFeeAccountId, transfersInSuspenseAccountId, incomeFromPenaltyAccountId</td>
                 </tr>
             </table>
             <br/>
             <table class=matrixHeading>
                 <tr class="matrixHeadingBG"><td><div class="mifosXHeading2">Optional Fields</div></td></tr>
-                <tr class=alt><td>minRequiredOpeningBalance, lockinPeriodFrequency, lockinPeriodFrequencyType, withdrawalFeeAmount, withdrawalFeeType,withdrawalFeeForTransfers, annualFeeAmount, annualFeeOnMonthDay, monthDayFormat, paymentChannelToFundSourceMappings, charges</tr>
+                <tr class=alt><td>minRequiredOpeningBalance, lockinPeriodFrequency, lockinPeriodFrequencyType, withdrawalFeeAmount, withdrawalFeeType,withdrawalFeeForTransfers, annualFeeAmount, annualFeeOnMonthDay, monthDayFormat, paymentChannelToFundSourceMappings, feeToIncomeAccountMappings, penaltyToIncomeAccountMappings, charges</tr>
             </table>
         </div>
         <div class="method-example">
@@ -12428,6 +12446,19 @@ Request Body:
   "savingsControlAccountId": "15",
   "interestOnSavingsAccountId": "18",
   "incomeFromFeeAccountId": "4",
+  "incomeFromPenaltyAccountId": "4",
+  "feeToIncomeAccountMappings":[
+      {
+         "chargeId":"6",
+         "incomeAccountId":"16"
+      }
+   ],
+   "penaltyToIncomeAccountMappings":[
+	  {
+	     "chargeId":"4",
+	     "incomeAccountId":"15"
+	  }
+  ],
   "paymentChannelToFundSourceMappings": [
     {
       "paymentTypeId": "14",
@@ -12515,12 +12546,26 @@ Request Body:
     "code": "accountingRuleType.cash",
     "value": "CASH BASED"
   },
-  "accountingMappings": {
-    "savingsReferenceAccountId": 16,
-    "incomeFromFeeAccountId": 4,
-    "interestOnSavingsAccountId": 18,
-    "savingsControlAccountId": 15
-  },
+  "accountingMappings":{
+      "savingsReferenceAccountId":1,
+      "incomeFromFeeAccountId":5,
+      "interestOnSavingsAccountId":4,
+      "savingsControlAccountId":2,
+      "transfersInSuspenseAccountId":3,
+      "incomeFromPenaltyAccountId":15
+   },
+  "feeToIncomeAccountMappings":[
+      {
+         "chargeId":6,
+         "incomeAccountId":16
+      }
+  ],
+  "penaltyToIncomeAccountMappings":[
+      {
+         "chargeId":4,
+         "incomeAccountId":15
+      }
+  ],
   "paymentChannelToFundSourceMappings": [
     {
       "paymentTypeId": 14,
@@ -14344,8 +14389,10 @@ POST savingsaccounts/1/charges/2?command=paycharge
 Content-Type: application/json 
 Request Body: 
 {
+  "dateFormat": "dd MMMM yyyy",
   "locale": "en",
   "amount": "60",
+  "dueDate": "12 September 2013"
 }
 					</code>
 					<code class="method-response">
@@ -18735,6 +18782,27 @@ No Request Body:
                             <td class=fielddesc>Denotes the accounting rule id for posting journal entries.
                         	</td>
                         </tr>
+						<tr class=alt>
+                            <td>officeRunningBalance</td>
+                        </tr>
+                        <tr>
+                            <td class=fielddesc>Describes office balance after the journal entry for the Ledger Account.
+                        	</td>
+                        </tr>
+						<tr class=alt>
+                            <td>organizationRunningBalance</td>
+                        </tr>
+                        <tr>
+                            <td class=fielddesc>Describes complete organization balances after the journal entry for the Ledger Account.
+                        	</td>
+                        </tr>
+						<tr class=alt>
+                            <td>runningBalanceComputed</td>
+                        </tr>
+                        <tr>
+                            <td class=fielddesc>Describes whether account balances computed for the journal entry.
+                        	</td>
+                        </tr>
                     </table>
                 </div>
             </div>
@@ -18869,7 +18937,10 @@ GET https://DomainName/api/v1/journalentries?transactionId=PB37X8Y21EQUY4S
         5
       ],
       "createdByUserName": "mifos",
-      "reversed": false
+      "reversed": false,
+	  "officeRunningBalance":0,
+	  "organizationRunningBalance":0
+	  "runningBalanceComputed":false
     },
     {
       "id": 2,
@@ -18909,7 +18980,11 @@ GET https://DomainName/api/v1/journalentries?transactionId=PB37X8Y21EQUY4S
         5
       ],
       "createdByUserName": "mifos",
-      "reversed": false
+      "reversed": false,
+	  "officeRunningBalance":0,
+	  "organizationRunningBalance":0
+	  "runningBalanceComputed":false
+
     }
   ]
 }
@@ -19100,6 +19175,46 @@ Request Body:
                 </div>
             </div>
 
+            <a id="journalentries_updatebalance" name="journalentries_updatebalance" class="old-syle-anchor">&nbsp;</a>
+            <div class="method-section">
+                <div class="method-description">
+                    <h4>Update Running balances for Journal Entries</h4>
+                    <p>
+                        This API calculates the running balances for office. If office ID not provided this API calculates running balances for all offices.
+                        <br>
+                    </p>
+                    <table class=matrixHeading>
+                        <tr class="matrixHeadingBG">
+                            <td><div class="mifosXHeading2">Mandatory Fields</div></td>
+                        </tr>
+                        <tr class=alt>
+                            <td>officeId 
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="method-example">
+                    <code class="method-declaration">
+POST https://DomainName/api/v1/journalentries?command=updateRunningBalance
+                    </code>
+                    <code class="method-request">
+POST journalentries
+Content-Type: application/json 
+Request Body:
+{
+"officeId": 1,
+}
+                    </code>
+                    <code class="method-response">
+{
+    "officeId": 1,
+}
+                    </code>
+                   
+                </div>
+            </div>
+
+			
             <a id="journalentries_retrieve" name="journalentries_retrieve"
                 class="old-syle-anchor">&nbsp;</a>
             <div class="method-section">
@@ -19149,7 +19264,11 @@ GET https://DomainName/api/v1/journalentries/{entryId}
         2
     ],
     "createdByUserName": "mifos",
-    "reversed": false
+    "reversed": false,
+	"officeRunningBalance":0,
+	"organizationRunningBalance":0
+	"runningBalanceComputed":false
+
 }
                     </code>
                 </div>
@@ -19797,7 +19916,8 @@ GET https://DomainName/api/v1/search?query=000000111
 				<tr class="alt">
 					<td><a href="#journalentries">Journal Entries</a></td>
 					<td>journalentries</td>
-					<td><a href="#journalentries_create">Create Journal Entries</a></td>
+					<td><a href="#journalentries_create">Create Journal Entries</a><br>
+					<a href="#journalentries_updatebalance">Update Journal Entries Running Balance</a></td>
 					<td><a href="#journalentries_list">List Journal Entries</a></td>
 					<td></td>
 					<td></td>
